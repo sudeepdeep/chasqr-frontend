@@ -448,7 +448,13 @@ export default function SiteAdmin() {
           {/* SEO Tab */}
           {mainTab === 'seo' && site && (
             <div className="py-6">
-              <SEOEditor siteId={site.siteId} pages={site.pages} />
+              <SEOEditor
+                siteId={site.siteId}
+                pages={site.pages}
+                onSaveSuccess={(updatedPages) => {
+                  setSite((prev: any) => ({ ...prev, pages: updatedPages }));
+                }}
+              />
             </div>
           )}
 

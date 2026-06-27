@@ -59,9 +59,9 @@ export default function Landing() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.6 }}
         >
-          <span className="inline-block bg-accent-light text-accent text-xs font-semibold px-3 py-1 rounded-full mb-6 tracking-widest uppercase border border-accent/20">
+          {/* <span className="inline-block bg-accent-light text-accent text-xs font-semibold px-3 py-1 rounded-full mb-6 tracking-widest uppercase border border-accent/20">
             Now in Beta
-          </span>
+          </span> */}
 
           <h1 className="font-bebas text-7xl md:text-9xl text-slate-900 leading-none mb-6">
             Deploy Your

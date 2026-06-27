@@ -16,9 +16,10 @@ interface Page {
 interface Props {
   siteId: string;
   pages: Page[];
+  onSaveSuccess?: (updatedPages: Page[]) => void;
 }
 
-export default function SEOEditor({ siteId, pages }: Props) {
+export default function SEOEditor({ siteId, pages, onSaveSuccess }: Props) {
   const [selectedPage, setSelectedPage] = useState(0);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -55,10 +56,16 @@ export default function SEOEditor({ siteId, pages }: Props) {
     if (!currentPage) return;
     setSaving(true);
     try {
-      await updateSEOAPI(siteId, {
+      const res = await updateSEOAPI(siteId, {
         page: currentPage.filename,
         ...formData,
       });
+
+      // Update parent's site state with new pages
+      if (onSaveSuccess && res.data.data.site) {
+        onSaveSuccess(res.data.data.site.pages);
+      }
+
       setDirty(false);
       toast.success('SEO updated and deployed!');
     } catch (err: any) {
