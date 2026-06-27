@@ -23,6 +23,16 @@ export const updateContentAPI = (
 export const renameSiteAPI = (siteId: string, name: string) =>
   api.put(`/api/sites/${siteId}/name`, { name });
 
+export const redeployZipAPI = (siteId: string, formData: FormData) =>
+  api.put(`/api/sites/${siteId}/redeploy-zip`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+
+export const redeployFilesAPI = (siteId: string, formData: FormData) =>
+  api.put(`/api/sites/${siteId}/redeploy-files`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+
 export const updateSlugAPI = (siteId: string, slug: string) =>
   api.put(`/api/sites/${siteId}/slug`, { slug });
 

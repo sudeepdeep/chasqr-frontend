@@ -1,9 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-toastify';
-import { ExternalLink, ChevronRight, Eye, Rocket, X, FileCode, Link2, Check, Pencil } from 'lucide-react';
-import { getSiteAPI, updateContentAPI, updateSlugAPI } from '../api/site.api';
+import {
+  ExternalLink, ChevronRight, Eye, Rocket, X, FileCode,
+  Link2, Check, Pencil, UploadCloud, Archive, FileText, ChevronDown,
+} from 'lucide-react';
+import {
+  getSiteAPI, updateContentAPI, updateSlugAPI,
+  redeployZipAPI, redeployFilesAPI,
+} from '../api/site.api';
 import ContentEditor from '../components/ContentEditor';
 
 const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
@@ -24,6 +30,16 @@ export default function SiteAdmin() {
   const [slugValue, setSlugValue] = useState('');
   const [slugSaving, setSlugSaving] = useState(false);
   const [slugError, setSlugError] = useState('');
+
+  // Redeploy
+  const [redeployOpen, setRedeployOpen] = useState(false);
+  const [redeployMode, setRedeployMode] = useState<'zip' | 'files'>('zip');
+  const [redeploying, setRedeploying] = useState(false);
+  const [redeployFile, setRedeployFile] = useState<File | null>(null);
+  const [redeployFiles, setRedeployFilesState] = useState<File[]>([]);
+  const [redeployPaths, setRedeployPaths] = useState<string[]>([]);
+  const zipRef = useRef<HTMLInputElement>(null);
+  const filesRef = useRef<HTMLInputElement>(null);
 
   const hasChanges = Object.keys(pendingEdits).length > 0;
   const previewUrl = site ? `${BASE_URL}/sites/${site.slug}/` : '';
@@ -73,6 +89,37 @@ export default function SiteAdmin() {
       toast.error(err.response?.data?.message || 'Failed to update URL');
     } finally {
       setSlugSaving(false);
+    }
+  };
+
+  const handleRedeploy = async () => {
+    if (!siteId) return;
+    const hasSelection = redeployFile || redeployFiles.length > 0;
+    if (!hasSelection) { toast.error('Please select a file first'); return; }
+
+    setRedeploying(true);
+    try {
+      let res;
+      if (redeployFile) {
+        const fd = new FormData();
+        fd.append('file', redeployFile);
+        res = await redeployZipAPI(siteId, fd);
+      } else {
+        const fd = new FormData();
+        redeployFiles.forEach(f => fd.append('files', f));
+        fd.append('paths', JSON.stringify(redeployPaths));
+        res = await redeployFilesAPI(siteId, fd);
+      }
+      setSite(res.data.data.site);
+      setActivePage(0);
+      setRedeployOpen(false);
+      setRedeployFile(null);
+      setRedeployFilesState([]);
+      toast.success('Site redeployed successfully!');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Redeploy failed');
+    } finally {
+      setRedeploying(false);
     }
   };
 
@@ -138,6 +185,7 @@ export default function SiteAdmin() {
 
       <div className="max-w-3xl mx-auto">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+
           {/* Breadcrumb */}
           <div className="flex items-center gap-1.5 text-sm text-slate-400 mb-6">
             <Link to="/dashboard" className="hover:text-primary transition-colors">Dashboard</Link>
@@ -170,8 +218,8 @@ export default function SiteAdmin() {
             </a>
           </div>
 
-          {/* URL / Slug editor */}
-          <div className="mb-8 p-4 bg-slate-50 rounded-xl border border-slate-200">
+          {/* URL editor */}
+          <div className="mb-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
             <p className="text-xs font-medium text-slate-500 mb-2 flex items-center gap-1.5">
               <Link2 size={12} /> Site URL
             </p>
@@ -185,7 +233,10 @@ export default function SiteAdmin() {
                     autoFocus
                     value={slugValue}
                     onChange={(e) => handleSlugChange(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleSlugSave(); if (e.key === 'Escape') { setEditingSlug(false); setSlugValue(site.slug); setSlugError(''); } }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSlugSave();
+                      if (e.key === 'Escape') { setEditingSlug(false); setSlugValue(site.slug); setSlugError(''); }
+                    }}
                     className="flex-1 px-3 py-2 text-sm focus:outline-none bg-white font-mono"
                     maxLength={50}
                   />
@@ -200,9 +251,7 @@ export default function SiteAdmin() {
               </div>
             ) : (
               <div className="flex items-center justify-between gap-3">
-                <span className="text-sm font-mono text-primary truncate">
-                  {BASE_URL}/sites/{site.slug}/
-                </span>
+                <span className="text-sm font-mono text-primary truncate">{BASE_URL}/sites/{site.slug}/</span>
                 <button
                   onClick={() => setEditingSlug(true)}
                   className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-primary border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-white transition-colors shrink-0"
@@ -211,6 +260,107 @@ export default function SiteAdmin() {
                 </button>
               </div>
             )}
+          </div>
+
+          {/* Update Files Section */}
+          <div className="mb-8 border border-slate-200 rounded-xl overflow-hidden">
+            <button
+              onClick={() => setRedeployOpen(p => !p)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors text-sm"
+            >
+              <span className="flex items-center gap-2 font-medium text-slate-700">
+                <UploadCloud size={15} className="text-primary" />
+                Update Site Files
+              </span>
+              <ChevronDown size={15} className={`text-slate-400 transition-transform ${redeployOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            <AnimatePresence>
+              {redeployOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="p-4 space-y-4">
+                    <p className="text-xs text-slate-500">
+                      Upload a new version of your site. All existing files will be replaced. Your URL and settings stay the same.
+                    </p>
+
+                    {/* Mode toggle */}
+                    <div className="flex bg-slate-100 rounded-lg p-1 w-fit">
+                      {(['zip', 'files'] as const).map(m => (
+                        <button
+                          key={m}
+                          onClick={() => { setRedeployMode(m); setRedeployFile(null); setRedeployFilesState([]); }}
+                          className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                            redeployMode === m ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                          }`}
+                        >
+                          {m === 'zip' ? <Archive size={13} /> : <FileText size={13} />}
+                          {m === 'zip' ? 'ZIP File' : 'Files'}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* File picker */}
+                    <div
+                      onClick={() => redeployMode === 'zip' ? zipRef.current?.click() : filesRef.current?.click()}
+                      className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center cursor-pointer hover:border-primary/40 hover:bg-primary-light/30 transition-colors"
+                    >
+                      {redeployMode === 'zip' ? (
+                        redeployFile ? (
+                          <p className="text-sm text-primary font-medium">📦 {redeployFile.name} — {(redeployFile.size / 1024).toFixed(1)} KB</p>
+                        ) : (
+                          <p className="text-sm text-slate-400">Click to select a ZIP file</p>
+                        )
+                      ) : (
+                        redeployFiles.length > 0 ? (
+                          <p className="text-sm text-primary font-medium">📄 {redeployFiles.length} file{redeployFiles.length !== 1 ? 's' : ''} selected</p>
+                        ) : (
+                          <p className="text-sm text-slate-400">Click to select files or a folder</p>
+                        )
+                      )}
+                    </div>
+
+                    <input
+                      ref={zipRef}
+                      type="file"
+                      accept=".zip"
+                      className="hidden"
+                      onChange={e => { const f = e.target.files?.[0]; if (f) setRedeployFile(f); }}
+                    />
+                    <input
+                      ref={filesRef}
+                      type="file"
+                      multiple
+                      // @ts-ignore
+                      webkitdirectory=""
+                      className="hidden"
+                      onChange={e => {
+                        const files = Array.from(e.target.files || []);
+                        const paths = files.map(f => (f as any).webkitRelativePath || f.name);
+                        setRedeployFilesState(files);
+                        setRedeployPaths(paths);
+                      }}
+                    />
+
+                    <button
+                      onClick={handleRedeploy}
+                      disabled={redeploying || (!redeployFile && redeployFiles.length === 0)}
+                      className="w-full flex items-center justify-center gap-2 bg-primary text-white font-semibold py-2.5 rounded-xl hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    >
+                      {redeploying
+                        ? <><span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full inline-block" /> Redeploying...</>
+                        : <><Rocket size={14} /> Redeploy Site</>
+                      }
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Page Tabs */}
@@ -250,6 +400,7 @@ export default function SiteAdmin() {
               onEditsChange={setPendingEdits}
             />
           )}
+
         </motion.div>
       </div>
     </div>
