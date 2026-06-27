@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-toastify';
 import {
   ExternalLink, ChevronRight, Eye, Rocket, X, FileCode,
-  Link2, Check, Pencil, UploadCloud, Archive, FileText, ChevronDown, BarChart3,
+  Link2, Check, Pencil, UploadCloud, Archive, FileText, ChevronDown, BarChart3, Globe,
 } from 'lucide-react';
 import {
   getSiteAPI, updateContentAPI, updateSlugAPI,
@@ -12,6 +12,7 @@ import {
 } from '../api/site.api';
 import ContentEditor from '../components/ContentEditor';
 import AnalyticsChart from '../components/AnalyticsChart';
+import SEOEditor from '../components/SEOEditor';
 
 const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
@@ -43,7 +44,7 @@ export default function SiteAdmin() {
   const filesRef = useRef<HTMLInputElement>(null);
 
   // Main tabs
-  const [mainTab, setMainTab] = useState<'editor' | 'analytics'>('editor');
+  const [mainTab, setMainTab] = useState<'editor' | 'seo' | 'analytics'>('editor');
 
   const hasChanges = Object.keys(pendingEdits).length > 0;
   const previewUrl = site ? `${BASE_URL}/sites/${site.slug}/` : '';
@@ -380,6 +381,16 @@ export default function SiteAdmin() {
               <FileCode size={14} /> Editor
             </button>
             <button
+              onClick={() => setMainTab('seo')}
+              className={`flex items-center gap-2 px-4 py-3 font-medium text-sm border-b-2 -mb-px transition-colors ${
+                mainTab === 'seo'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Globe size={14} /> SEO
+            </button>
+            <button
               onClick={() => setMainTab('analytics')}
               className={`flex items-center gap-2 px-4 py-3 font-medium text-sm border-b-2 -mb-px transition-colors ${
                 mainTab === 'analytics'
@@ -432,6 +443,13 @@ export default function SiteAdmin() {
             />
           )}
             </>
+          )}
+
+          {/* SEO Tab */}
+          {mainTab === 'seo' && site && (
+            <div className="py-6">
+              <SEOEditor siteId={site.siteId} pages={site.pages} />
+            </div>
           )}
 
           {/* Analytics Tab */}

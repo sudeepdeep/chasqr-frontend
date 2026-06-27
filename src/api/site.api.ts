@@ -47,3 +47,8 @@ export const deleteSiteAPI = (siteId: string) =>
 
 export const getAnalyticsAPI = (siteId: string) =>
   api.get(`/api/sites/${siteId}/analytics`);
+
+export const updateSEOAPI = (
+  siteId: string,
+  data: { page: string; title?: string; metaDescription?: string; ogImage?: string; ogTitle?: string; ogDescription?: string }
+) => api.put(`/api/sites/${siteId}/seo`, data);
