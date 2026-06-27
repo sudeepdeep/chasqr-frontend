@@ -4,13 +4,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-toastify';
 import {
   ExternalLink, ChevronRight, Eye, Rocket, X, FileCode,
-  Link2, Check, Pencil, UploadCloud, Archive, FileText, ChevronDown,
+  Link2, Check, Pencil, UploadCloud, Archive, FileText, ChevronDown, BarChart3,
 } from 'lucide-react';
 import {
   getSiteAPI, updateContentAPI, updateSlugAPI,
   redeployZipAPI, redeployFilesAPI,
 } from '../api/site.api';
 import ContentEditor from '../components/ContentEditor';
+import AnalyticsChart from '../components/AnalyticsChart';
 
 const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
@@ -40,6 +41,9 @@ export default function SiteAdmin() {
   const [redeployPaths, setRedeployPaths] = useState<string[]>([]);
   const zipRef = useRef<HTMLInputElement>(null);
   const filesRef = useRef<HTMLInputElement>(null);
+
+  // Analytics
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
 
   const hasChanges = Object.keys(pendingEdits).length > 0;
   const previewUrl = site ? `${BASE_URL}/sites/${site.slug}/` : '';
@@ -357,6 +361,36 @@ export default function SiteAdmin() {
                         : <><Rocket size={14} /> Redeploy Site</>
                       }
                     </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Analytics Section */}
+          <div className="mb-8 border border-slate-200 rounded-xl overflow-hidden">
+            <button
+              onClick={() => setAnalyticsOpen(p => !p)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors text-sm"
+            >
+              <span className="flex items-center gap-2 font-medium text-slate-700">
+                <BarChart3 size={15} className="text-primary" />
+                Analytics
+              </span>
+              <ChevronDown size={15} className={`text-slate-400 transition-transform ${analyticsOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            <AnimatePresence>
+              {analyticsOpen && siteId && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="p-6">
+                    <AnalyticsChart siteId={siteId} />
                   </div>
                 </motion.div>
               )}

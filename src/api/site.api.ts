@@ -44,3 +44,6 @@ export const toggleStatusAPI = (siteId: string) =>
 
 export const deleteSiteAPI = (siteId: string) =>
   api.delete(`/api/sites/${siteId}`);
+
+export const getAnalyticsAPI = (siteId: string) =>
+  api.get(`/api/sites/${siteId}/analytics`);
