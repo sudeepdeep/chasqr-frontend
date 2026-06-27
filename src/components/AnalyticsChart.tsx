@@ -6,6 +6,7 @@ import { getAnalyticsAPI } from '../api/site.api';
 interface AnalyticsData {
   total: number;
   last30Days: number;
+  dailyAverage: number;
   chartData: Array<{ date: string; visits: number }>;
 }
 
@@ -38,7 +39,6 @@ export default function AnalyticsChart({ siteId }: { siteId: string }) {
 
   // Find max visits for scaling
   const maxVisits = Math.max(...data.chartData.map(d => d.visits), 1);
-  const avgVisits = Math.round(data.last30Days / 30);
 
   return (
     <div className="space-y-6">
@@ -79,7 +79,7 @@ export default function AnalyticsChart({ siteId }: { siteId: string }) {
             <BarChart3 size={14} className="text-purple-400" />
             <p className="text-xs font-medium text-slate-500">Daily Average</p>
           </div>
-          <p className="font-bebas text-3xl text-slate-900">{avgVisits}</p>
+          <p className="font-bebas text-3xl text-slate-900">{data.dailyAverage}</p>
         </motion.div>
       </div>
 
