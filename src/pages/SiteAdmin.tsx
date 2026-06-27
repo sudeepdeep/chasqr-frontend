@@ -42,8 +42,8 @@ export default function SiteAdmin() {
   const zipRef = useRef<HTMLInputElement>(null);
   const filesRef = useRef<HTMLInputElement>(null);
 
-  // Analytics
-  const [analyticsOpen, setAnalyticsOpen] = useState(false);
+  // Main tabs
+  const [mainTab, setMainTab] = useState<'editor' | 'analytics'>('editor');
 
   const hasChanges = Object.keys(pendingEdits).length > 0;
   const previewUrl = site ? `${BASE_URL}/sites/${site.slug}/` : '';
@@ -367,38 +367,35 @@ export default function SiteAdmin() {
             </AnimatePresence>
           </div>
 
-          {/* Analytics Section */}
-          <div className="mb-8 border border-slate-200 rounded-xl overflow-hidden">
+          {/* Main Tabs */}
+          <div className="flex gap-4 mb-8 border-b border-slate-200">
             <button
-              onClick={() => setAnalyticsOpen(p => !p)}
-              className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors text-sm"
+              onClick={() => setMainTab('editor')}
+              className={`flex items-center gap-2 px-4 py-3 font-medium text-sm border-b-2 -mb-px transition-colors ${
+                mainTab === 'editor'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
             >
-              <span className="flex items-center gap-2 font-medium text-slate-700">
-                <BarChart3 size={15} className="text-primary" />
-                Analytics
-              </span>
-              <ChevronDown size={15} className={`text-slate-400 transition-transform ${analyticsOpen ? 'rotate-180' : ''}`} />
+              <FileCode size={14} /> Editor
             </button>
-
-            <AnimatePresence>
-              {analyticsOpen && siteId && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="overflow-hidden"
-                >
-                  <div className="p-6">
-                    <AnalyticsChart siteId={siteId} />
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <button
+              onClick={() => setMainTab('analytics')}
+              className={`flex items-center gap-2 px-4 py-3 font-medium text-sm border-b-2 -mb-px transition-colors ${
+                mainTab === 'analytics'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <BarChart3 size={14} /> Analytics
+            </button>
           </div>
 
-          {/* Page Tabs */}
-          {pages.length > 1 && (
+          {/* Editor Tab */}
+          {mainTab === 'editor' && (
+            <>
+              {/* Page Tabs */}
+              {pages.length > 1 && (
             <div className="flex gap-1 mb-6 border-b border-slate-200 overflow-x-auto">
               {pages.map((page, idx) => (
                 <button
@@ -433,6 +430,15 @@ export default function SiteAdmin() {
               externalEdits={pendingEdits}
               onEditsChange={setPendingEdits}
             />
+          )}
+            </>
+          )}
+
+          {/* Analytics Tab */}
+          {mainTab === 'analytics' && siteId && (
+            <div className="py-6">
+              <AnalyticsChart siteId={siteId} />
+            </div>
           )}
 
         </motion.div>
