@@ -10,3 +10,9 @@ export const googleAuthAPI = (credential: string) =>
   api.post('/api/auth/google', { credential });
 
 export const getMeAPI = () => api.get('/api/auth/me');
+
+export const forgotPasswordAPI = (email: string) =>
+  api.post('/api/auth/forgot-password', { email });
+
+export const resetPasswordAPI = (token: string, email: string, new_password: string) =>
+  api.post('/api/auth/reset-password', { token, email, new_password });
