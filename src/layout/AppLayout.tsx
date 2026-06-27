@@ -1,11 +1,11 @@
-import { Outlet } from "react-router-dom";
+import { Outlet } from 'react-router-dom';
+import Navbar from '../components/Navbar';
 
-function AppLayout() {
+export default function AppLayout() {
   return (
-    <div className="">
+    <div className="min-h-screen bg-white font-inter">
+      <Navbar />
       <Outlet />
     </div>
   );
 }
-
-export default AppLayout;

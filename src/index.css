@@ -1,3 +1,40 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ─── Global Color Tokens ───────────────────────────────────────────────────
+   Change any value here and it reflects across the entire app automatically.
+   primary  = main brand blue
+   accent   = highlight orange (CTAs, badges, stats)
+   neutral  = text / borders / backgrounds
+──────────────────────────────────────────────────────────────────────────── */
+:root {
+  --primary:        37 99 235;    /* #2563EB  — change this to rebrand blue  */
+  --primary-dark:   29 78 216;    /* #1D4ED8  — hover state                  */
+  --primary-light:  239 246 255;  /* #EFF6FF  — tinted background             */
+
+  --accent:         249 115 22;   /* #F97316  — change this to rebrand orange */
+  --accent-dark:    234 88 12;    /* #EA580C  — hover state                   */
+  --accent-light:   255 247 237;  /* #FFF7ED  — tinted background             */
+
+  --bg:             255 255 255;  /* #FFFFFF  — page background               */
+  --bg-subtle:      248 250 252;  /* #F8FAFC  — subtle section bg             */
+  --text:           15 23 42;     /* #0F172A  — primary text                  */
+  --text-muted:     100 116 139;  /* #64748B  — secondary text                */
+  --border:         226 232 240;  /* #E2E8F0  — borders                       */
+}
+
+@layer base {
+  body {
+    font-family: 'Inter', sans-serif;
+    background-color: rgb(var(--bg));
+    color: rgb(var(--text));
+  }
+}
+
+@layer utilities {
+  .font-bebas {
+    font-family: 'Bebas Neue', sans-serif;
+    letter-spacing: 0.02em;
+  }
+}
