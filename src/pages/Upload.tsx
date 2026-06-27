@@ -7,7 +7,6 @@ import { uploadZipAPI, uploadFilesAPI } from '../api/site.api';
 import FileUploader from '../components/FileUploader';
 
 const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-const SLUG_REGEX = /^[a-z0-9-]*$/;
 
 export default function Upload() {
   const navigate = useNavigate();
