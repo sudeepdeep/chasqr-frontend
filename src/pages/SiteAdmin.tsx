@@ -9,6 +9,7 @@ import {
 import {
   getSiteAPI, updateContentAPI, updateSlugAPI,
   redeployZipAPI, redeployFilesAPI,
+  setCustomDomainAPI, removeCustomDomainAPI,
 } from '../api/site.api';
 import ContentEditor from '../components/ContentEditor';
 import AnalyticsChart from '../components/AnalyticsChart';
@@ -43,6 +44,11 @@ export default function SiteAdmin() {
   const zipRef = useRef<HTMLInputElement>(null);
   const filesRef = useRef<HTMLInputElement>(null);
 
+  // Custom domain
+  const [domainValue, setDomainValue] = useState('');
+  const [domainSaving, setDomainSaving] = useState(false);
+  const [domainRemoving, setDomainRemoving] = useState(false);
+
   // Main tabs
   const [mainTab, setMainTab] = useState<'editor' | 'seo' | 'analytics'>('editor');
 
@@ -52,7 +58,12 @@ export default function SiteAdmin() {
   useEffect(() => {
     if (!siteId) return;
     getSiteAPI(siteId)
-      .then((res) => { setSite(res.data.data.site); setSlugValue(res.data.data.site.slug); })
+      .then((res) => {
+        const s = res.data.data.site;
+        setSite(s);
+        setSlugValue(s.slug);
+        setDomainValue(s.customDomain || '');
+      })
       .catch(() => toast.error('Failed to load site'))
       .finally(() => setLoading(false));
   }, [siteId]);
@@ -125,6 +136,36 @@ export default function SiteAdmin() {
       toast.error(err.response?.data?.message || 'Redeploy failed');
     } finally {
       setRedeploying(false);
+    }
+  };
+
+  const handleDomainSave = async () => {
+    if (!siteId || !domainValue.trim()) return;
+    setDomainSaving(true);
+    try {
+      const res = await setCustomDomainAPI(siteId, domainValue.trim());
+      setSite(res.data.data.site);
+      setDomainValue(res.data.data.site.customDomain || '');
+      toast.success('Custom domain saved!');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to save domain');
+    } finally {
+      setDomainSaving(false);
+    }
+  };
+
+  const handleDomainRemove = async () => {
+    if (!siteId || !window.confirm('Remove custom domain?')) return;
+    setDomainRemoving(true);
+    try {
+      const res = await removeCustomDomainAPI(siteId);
+      setSite(res.data.data.site);
+      setDomainValue('');
+      toast.success('Custom domain removed');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to remove domain');
+    } finally {
+      setDomainRemoving(false);
     }
   };
 
@@ -263,6 +304,76 @@ export default function SiteAdmin() {
                 >
                   <Pencil size={11} /> Edit URL
                 </button>
+              </div>
+            )}
+          </div>
+
+          {/* Custom Domain Section */}
+          <div className="mb-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
+            <p className="text-xs font-medium text-slate-500 mb-3 flex items-center gap-1.5">
+              <Globe size={12} /> Custom Domain
+            </p>
+
+            {site.customDomain ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-mono text-green-600 truncate">
+                    http://{site.customDomain}
+                  </span>
+                  <button
+                    onClick={handleDomainRemove}
+                    disabled={domainRemoving}
+                    className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-700 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors shrink-0 disabled:opacity-50"
+                  >
+                    <X size={11} /> {domainRemoving ? 'Removing...' : 'Remove'}
+                  </button>
+                </div>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800 space-y-1.5">
+                  <p className="font-semibold">DNS setup required</p>
+                  <p>Add this A record at your domain registrar:</p>
+                  <div className="font-mono bg-white border border-blue-200 rounded px-2 py-1.5 text-blue-900 space-y-1">
+                    <div className="flex gap-4">
+                      <span className="text-slate-400 w-16">Type</span>
+                      <span>A</span>
+                    </div>
+                    <div className="flex gap-4">
+                      <span className="text-slate-400 w-16">Name</span>
+                      <span>@</span>
+                    </div>
+                    <div className="flex gap-4">
+                      <span className="text-slate-400 w-16">Value</span>
+                      <span className="text-primary">your-railway-ip</span>
+                    </div>
+                    <div className="flex gap-4">
+                      <span className="text-slate-400 w-16">TTL</span>
+                      <span>3600</span>
+                    </div>
+                  </div>
+                  <p className="text-blue-600">DNS changes can take up to 24–48 hours to propagate.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden bg-white focus-within:ring-2 focus-within:ring-primary">
+                  <span className="bg-slate-50 text-slate-400 text-sm px-3 py-2 border-r border-slate-200 whitespace-nowrap shrink-0">
+                    http://
+                  </span>
+                  <input
+                    value={domainValue}
+                    onChange={e => setDomainValue(e.target.value.toLowerCase().replace(/^https?:\/\//, ''))}
+                    onKeyDown={e => { if (e.key === 'Enter') handleDomainSave(); }}
+                    placeholder="yourdomain.com"
+                    className="flex-1 px-3 py-2 text-sm focus:outline-none bg-white font-mono"
+                  />
+                  <button
+                    onClick={handleDomainSave}
+                    disabled={domainSaving || !domainValue.trim()}
+                    className="px-3 py-2 text-green-600 hover:text-green-700 disabled:opacity-40 border-l border-slate-200"
+                  >
+                    <Check size={15} />
+                  </button>
+                </div>
+                <p className="text-xs text-slate-400">Enter your domain (e.g. mysite.com or blog.mysite.com)</p>
               </div>
             )}
           </div>

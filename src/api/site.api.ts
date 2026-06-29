@@ -52,3 +52,9 @@ export const updateSEOAPI = (
   siteId: string,
   data: { page: string; title?: string; metaDescription?: string; ogImage?: string; ogTitle?: string; ogDescription?: string }
 ) => api.put(`/api/sites/${siteId}/seo`, data);
+
+export const setCustomDomainAPI = (siteId: string, domain: string) =>
+  api.put(`/api/sites/${siteId}/custom-domain`, { domain });
+
+export const removeCustomDomainAPI = (siteId: string) =>
+  api.delete(`/api/sites/${siteId}/custom-domain`);
