@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="favGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB" />
+      <stop offset="100%" stop-color="#1D4ED8" />
+    </linearGradient>
+  </defs>
+
+  <!-- Main Terminal Base Grid -->
+  <rect width="512" height="512" rx="110" fill="url(#favGrad)" />
+
+  <!-- High-Visibility Deployment Lightning Bolt -->
+  <path d="M 296 150 L 170 298 L 240 298 L 210 410 L 342 262 L 272 262 Z" fill="#FFFFFF" />
+
+  <!-- High-Visibility Terminal Cursor Command -->
+  <rect x="315" y="375" width="85" height="30" rx="6" fill="#38BDF8" />
+</svg>
