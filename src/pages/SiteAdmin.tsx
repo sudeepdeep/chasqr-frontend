@@ -342,7 +342,7 @@ export default function SiteAdmin() {
                     </div>
                     <div className="flex gap-4">
                       <span className="text-slate-400 w-16">Value</span>
-                      <span className="text-primary">your-railway-ip</span>
+                      <span className="text-primary">137.184.18.70</span>
                     </div>
                     <div className="flex gap-4">
                       <span className="text-slate-400 w-16">TTL</span>
