@@ -19,7 +19,8 @@ export default function Navbar() {
       className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-slate-100"
     >
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-        <Link to="/" className="font-bebas text-2xl text-primary tracking-widest">
+        <Link to="/" className="flex items-center gap-2 font-bebas text-2xl text-primary tracking-widest">
+          <img src="/logo.svg" alt="Chasqr" className="w-7 h-7" />
           CHASQR
         </Link>
 

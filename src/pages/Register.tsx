@@ -44,7 +44,10 @@ export default function Register() {
         className="w-full max-w-md"
       >
         <div className="text-center mb-8">
-          <Link to="/" className="font-bebas text-3xl text-primary tracking-widest">CHASQR</Link>
+          <Link to="/" className="inline-flex items-center gap-2 font-bebas text-3xl text-primary tracking-widest">
+            <img src="/logo.svg" alt="Chasqr" className="w-8 h-8" />
+            CHASQR
+          </Link>
           <h1 className="font-bebas text-4xl text-slate-900 mt-3">Create Account</h1>
           <p className="text-slate-500 text-sm mt-1">Start deploying for free</p>
         </div>

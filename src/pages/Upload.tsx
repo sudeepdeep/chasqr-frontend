@@ -82,7 +82,7 @@ export default function Upload() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="font-bebas text-5xl text-slate-900 mb-2">Deploy A Site</h1>
           <p className="text-slate-500 text-sm mb-10">
-            Upload a ZIP of your project or select individual files. Your site goes live instantly.
+            Upload a ZIP of your project or select individual files. Your site goes live instantly — connect your own custom domain anytime after deploying.
           </p>
 
           {/* Site Name */}

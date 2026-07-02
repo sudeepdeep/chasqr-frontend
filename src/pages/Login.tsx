@@ -43,7 +43,10 @@ export default function Login() {
         className="w-full max-w-md"
       >
         <div className="text-center mb-8">
-          <Link to="/" className="font-bebas text-3xl text-primary tracking-widest">CHASQR</Link>
+          <Link to="/" className="inline-flex items-center gap-2 font-bebas text-3xl text-primary tracking-widest">
+            <img src="/logo.svg" alt="Chasqr" className="w-8 h-8" />
+            CHASQR
+          </Link>
           <h1 className="font-bebas text-4xl text-slate-900 mt-3">Welcome Back</h1>
           <p className="text-slate-500 text-sm mt-1">Sign in to your account</p>
         </div>

@@ -14,6 +14,21 @@ export const getMySitesAPI = () => api.get('/api/sites');
 
 export const getSiteAPI = (siteId: string) => api.get(`/api/sites/${siteId}`);
 
+export const getPageHTMLAPI = (siteId: string, page: string) =>
+  api.get(`/api/sites/${siteId}/raw`, { params: { page } });
+
+export const getColorsAPI = (siteId: string, page: string) =>
+  api.get(`/api/sites/${siteId}/colors`, { params: { page } });
+
+export const updateColorsAPI = (siteId: string, page: string, replacements: Record<string, string>) =>
+  api.put(`/api/sites/${siteId}/colors`, { page, replacements });
+
+export const updateElementsAPI = (
+  siteId: string,
+  page: string,
+  actions: { key: string; action: 'hide' | 'show' | 'duplicate' | 'delete' }[]
+) => api.put(`/api/sites/${siteId}/elements`, { page, actions });
+
 export const updateContentAPI = (
   siteId: string,
   page: string,
@@ -52,6 +67,14 @@ export const updateSEOAPI = (
   siteId: string,
   data: { page: string; title?: string; metaDescription?: string; ogImage?: string; ogTitle?: string; ogDescription?: string }
 ) => api.put(`/api/sites/${siteId}/seo`, data);
+
+export const uploadAssetAPI = (siteId: string, formData: FormData) =>
+  api.post(`/api/sites/${siteId}/assets`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+
+export const setFaviconAPI = (siteId: string, url: string) =>
+  api.put(`/api/sites/${siteId}/favicon`, { url });
 
 export const setCustomDomainAPI = (siteId: string, domain: string) =>
   api.put(`/api/sites/${siteId}/custom-domain`, { domain });

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Eye, Layers, Pencil, ExternalLink, Pause, Play, Trash2, Calendar, Check, X } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { renameSiteAPI } from '../api/site.api';
@@ -25,9 +25,12 @@ interface Props {
 
 
 export default function SiteCard({ site, onDelete, onToggle, onRename }: Props) {
+  const navigate = useNavigate();
   const previewUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/sites/${site.slug || site.siteId}/`;
   const totalElements = site.pages?.reduce((acc, p) => acc + p.contentMap.length, 0) ?? 0;
   const isActive = site.status === 'active';
+
+  const goToEdit = () => navigate(`/sites/${site.siteId}`);
 
   const [editing, setEditing] = useState(false);
   const [nameValue, setNameValue] = useState(site.name);
@@ -68,7 +71,8 @@ export default function SiteCard({ site, onDelete, onToggle, onRename }: Props) 
       exit={{ opacity: 0, y: -16 }}
       whileHover={{ y: -3, boxShadow: '0 20px 40px -12px rgba(0,0,0,0.10)' }}
       transition={{ duration: 0.2 }}
-      className="bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col relative shadow-sm"
+      onClick={goToEdit}
+      className="bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col relative shadow-sm cursor-pointer"
     >
       {/* Decorative circle — top right, always */}
       <div
@@ -80,7 +84,7 @@ export default function SiteCard({ site, onDelete, onToggle, onRename }: Props) 
         {/* Name row */}
         <div className="flex items-start justify-between mb-1 gap-2">
           {editing ? (
-            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 flex-1 min-w-0" onClick={e => e.stopPropagation()}>
               <input
                 ref={inputRef}
                 value={nameValue}
@@ -102,7 +106,7 @@ export default function SiteCard({ site, onDelete, onToggle, onRename }: Props) 
                 {site.name}
               </h3>
               <button
-                onClick={() => setEditing(true)}
+                onClick={(e) => { e.stopPropagation(); setEditing(true); }}
                 className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-primary transition-all shrink-0"
                 title="Rename site"
               >
@@ -151,7 +155,7 @@ export default function SiteCard({ site, onDelete, onToggle, onRename }: Props) 
         <div className="flex-1" />
 
         {/* Actions */}
-        <div className="pt-4 border-t border-slate-100 flex items-center gap-2">
+        <div className="pt-4 border-t border-slate-100 flex items-center gap-2" onClick={e => e.stopPropagation()}>
           <Link
             to={`/sites/${site.siteId}`}
             className="flex-1 flex items-center justify-center gap-2 bg-primary text-white text-sm font-semibold py-2.5 rounded-xl hover:bg-primary-dark transition-colors"
