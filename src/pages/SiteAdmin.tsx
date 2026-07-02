@@ -317,9 +317,14 @@ export default function SiteAdmin() {
             {site.customDomain ? (
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm font-mono text-green-600 truncate">
-                    http://{site.customDomain}
-                  </span>
+                  <a
+                    href={`https://${site.customDomain}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm font-mono text-green-600 truncate hover:underline"
+                  >
+                    https://{site.customDomain}
+                  </a>
                   <button
                     onClick={handleDomainRemove}
                     disabled={domainRemoving}
@@ -349,7 +354,7 @@ export default function SiteAdmin() {
                       <span>3600</span>
                     </div>
                   </div>
-                  <p className="text-blue-600">DNS changes can take up to 24–48 hours to propagate.</p>
+                  <p className="text-blue-600">DNS changes can take a few minutes to a few hours to propagate. HTTPS is issued automatically once your domain resolves here — no extra setup needed.</p>
                 </div>
               </div>
             ) : (
