@@ -16,7 +16,7 @@ export default function VerifyTransaction() {
   const [manualId, setManualId] = useState("");
   const ran = useRef(false);
 
-  const isPopup = Boolean(window.opener);
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   const verify = (id: string) => {
     setStatus("loading");
@@ -24,15 +24,36 @@ export default function VerifyTransaction() {
       .then((res) => {
         setStatus("success");
         setMessage(res.data.message || "Payment verified!");
-        // Running inside the checkout popup — tell the main page to continue
-        // the deploy automatically, then close ourselves.
+
+        // Notify any open Chasqr tab/window that payment is done so it can
+        // auto-continue the deploy. BroadcastChannel works even when the
+        // checkout provider severed the window.opener link (COOP).
+        try {
+          const bc = new BroadcastChannel("chasqr-payments");
+          bc.postMessage({ type: "chasqr:payment-verified" });
+          bc.close();
+        } catch { /* very old browsers — manual button still works */ }
         if (window.opener) {
-          window.opener.postMessage(
-            { type: "chasqr:payment-verified" },
-            window.location.origin,
-          );
-          setTimeout(() => window.close(), 2000);
+          try {
+            window.opener.postMessage(
+              { type: "chasqr:payment-verified" },
+              window.location.origin,
+            );
+          } catch { /* cross-origin opener — ignore */ }
         }
+
+        // Visible countdown, then close ourselves (works for script-opened popups)
+        let remaining = 5;
+        setCountdown(remaining);
+        const timer = setInterval(() => {
+          remaining -= 1;
+          if (remaining <= 0) {
+            clearInterval(timer);
+            window.close();
+          } else {
+            setCountdown(remaining);
+          }
+        }, 1000);
       })
       .catch((err) => {
         setStatus("error");
@@ -75,10 +96,12 @@ export default function VerifyTransaction() {
               Payment Confirmed!
             </h1>
             <p className="text-slate-500 text-sm mb-3">{message}</p>
-            {isPopup ? (
+            {countdown !== null ? (
               <p className="text-slate-500 text-sm mb-8">
-                Your deploy is continuing in the main window — this popup will
-                close automatically.
+                Your deploy is continuing in the main window. This popup will
+                close automatically in{" "}
+                <strong className="text-primary">{countdown}</strong> second
+                {countdown !== 1 ? "s" : ""}...
               </p>
             ) : (
               <>

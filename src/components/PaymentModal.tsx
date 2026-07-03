@@ -36,20 +36,37 @@ export default function PaymentModal({
     );
   };
 
-  // The verify page (running inside the popup) posts a message when the
-  // payment is confirmed — auto-continue the deploy without any clicks.
+  // The verify page (running inside the checkout popup) announces success via
+  // BroadcastChannel — auto-continue the deploy without any clicks. Also keep
+  // a window message listener as a secondary path when window.opener survives.
   useEffect(() => {
     if (!open) return;
     handledRef.current = false;
+
+    const handleVerified = () => {
+      if (handledRef.current) return;
+      handledRef.current = true;
+      onPaidConfirm();
+    };
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel("chasqr-payments");
+      bc.onmessage = (e) => {
+        if (e.data?.type === "chasqr:payment-verified") handleVerified();
+      };
+    } catch { /* BroadcastChannel unsupported — manual button still works */ }
+
     const onMessage = (e: MessageEvent) => {
       if (e.origin !== window.location.origin) return;
-      if (e.data?.type === "chasqr:payment-verified" && !handledRef.current) {
-        handledRef.current = true;
-        onPaidConfirm();
-      }
+      if (e.data?.type === "chasqr:payment-verified") handleVerified();
     };
     window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
+
+    return () => {
+      window.removeEventListener("message", onMessage);
+      bc?.close();
+    };
   }, [open, onPaidConfirm]);
   return (
     <AnimatePresence>
