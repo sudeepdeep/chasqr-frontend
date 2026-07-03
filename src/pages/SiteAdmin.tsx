@@ -19,6 +19,7 @@ import {
   Globe,
   ArrowUp,
   Palette,
+  Crown,
 } from "lucide-react";
 import {
   getSiteAPI,
@@ -35,6 +36,8 @@ import AnalyticsChart from "../components/AnalyticsChart";
 import SEOEditor from "../components/SEOEditor";
 import ColorEditor from "../components/ColorEditor";
 import FaviconEditor from "../components/FaviconEditor";
+import PaymentModal from "../components/PaymentModal";
+import { getPaymentInfoAPI } from "../api/payment.api";
 
 const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
@@ -113,6 +116,10 @@ export default function SiteAdmin() {
   const [domainSaving, setDomainSaving] = useState(false);
   const [domainRemoving, setDomainRemoving] = useState(false);
 
+  // Large redeploy payment gate
+  const [payModalOpen, setPayModalOpen] = useState(false);
+  const [payCheckoutUrl, setPayCheckoutUrl] = useState("");
+
   const hasChanges = Object.keys(pendingEdits).length > 0;
   const previewUrl = site ? `${BASE_URL}/sites/${site.slug}/` : "";
 
@@ -175,6 +182,10 @@ export default function SiteAdmin() {
     }
   };
 
+  const redeployTotalSize = redeployFile
+    ? redeployFile.size
+    : redeployFiles.reduce((acc, f) => acc + f.size, 0);
+
   const handleRedeploy = async () => {
     if (!siteId) return;
     const hasSelection = redeployFile || redeployFiles.length > 0;
@@ -183,6 +194,42 @@ export default function SiteAdmin() {
       return;
     }
 
+    // Free sites need a credit for redeploys over 5MB — PRO sites are unlimited
+    if (site?.plan !== "paid" && redeployTotalSize > 5 * 1024 * 1024) {
+      try {
+        const info = await getPaymentInfoAPI();
+        if ((info.data.data.credits || 0) < 1) {
+          setPayCheckoutUrl(info.data.data.checkoutUrl);
+          setPayModalOpen(true);
+          return;
+        }
+      } catch {
+        // fall through — backend enforces with a 402
+      }
+    }
+
+    await performRedeploy();
+  };
+
+  const handlePaidAndRedeploy = async () => {
+    try {
+      const info = await getPaymentInfoAPI();
+      if ((info.data.data.credits || 0) < 1) {
+        toast.error(
+          "Payment not verified yet — finish checkout in the other tab, then complete the verification page.",
+        );
+        return;
+      }
+    } catch {
+      toast.error("Could not check payment status — try again");
+      return;
+    }
+    setPayModalOpen(false);
+    await performRedeploy();
+  };
+
+  const performRedeploy = async () => {
+    if (!siteId) return;
     setRedeploying(true);
     try {
       let res;
@@ -202,7 +249,15 @@ export default function SiteAdmin() {
       setRedeployFilesState([]);
       toast.success("Site redeployed successfully!");
     } catch (err: any) {
-      toast.error(err.response?.data?.message || "Redeploy failed");
+      if (err.response?.status === 402) {
+        try {
+          const info = await getPaymentInfoAPI();
+          setPayCheckoutUrl(info.data.data.checkoutUrl);
+        } catch { /* modal opens regardless */ }
+        setPayModalOpen(true);
+      } else {
+        toast.error(err.response?.data?.message || "Redeploy failed");
+      }
     } finally {
       setRedeploying(false);
     }
@@ -298,6 +353,9 @@ export default function SiteAdmin() {
 
   const pages: Page[] = site.pages || [];
   const currentPage = pages[activePage];
+  // JS-rendered apps (React/Vue builds) have no instrumentable content on any page
+  const isJSRenderedApp =
+    pages.length > 0 && pages.every((p) => !p.contentMap?.length);
 
   return (
     <div className="min-h-screen bg-white pt-24 pb-16 px-6">
@@ -341,6 +399,17 @@ export default function SiteAdmin() {
         )}
       </AnimatePresence>
 
+      {/* Large redeploy payment modal */}
+      <PaymentModal
+        open={payModalOpen}
+        onClose={() => setPayModalOpen(false)}
+        totalSize={redeployTotalSize}
+        checkoutUrl={payCheckoutUrl}
+        onPaidConfirm={handlePaidAndRedeploy}
+        busy={redeploying}
+        confirmLabel="I've paid — redeploy now"
+      />
+
       {/* Back to top */}
       <AnimatePresence>
         {showTopBtn && (
@@ -381,6 +450,15 @@ export default function SiteAdmin() {
                 {site.name}
               </h1>
               <div className="flex items-center gap-3 mt-2">
+                {site.plan === "paid" && (
+                  <span
+                    title="PRO site — unlimited upload size"
+                    className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-700 border border-amber-300"
+                  >
+                    <Crown size={11} className="fill-amber-500 text-amber-500" />{" "}
+                    PRO
+                  </span>
+                )}
                 <span
                   className={`text-xs font-medium px-2.5 py-1 rounded-full ${
                     site.status === "active"
@@ -815,13 +893,28 @@ export default function SiteAdmin() {
               )}
 
               {/* Colors */}
-              {activeSection === "colors" && site && siteId && (
-                <ColorEditor
-                  siteId={siteId}
-                  pages={site.pages}
-                  previewBaseUrl={previewUrl}
-                />
-              )}
+              {activeSection === "colors" &&
+                site &&
+                siteId &&
+                (isJSRenderedApp ? (
+                  <div className="text-center py-16 border-2 border-dashed border-slate-200 rounded-2xl">
+                    <Palette size={40} className="text-slate-300 mx-auto mb-3" />
+                    <p className="text-slate-600 font-medium">
+                      Color editing not available
+                    </p>
+                    <p className="text-slate-400 text-sm mt-1 max-w-md mx-auto">
+                      JS-rendered apps (React, Vue, etc.) bundle their styles
+                      at build time, so colors can't be edited here. Update
+                      your theme in code and redeploy a new build.
+                    </p>
+                  </div>
+                ) : (
+                  <ColorEditor
+                    siteId={siteId}
+                    pages={site.pages}
+                    previewBaseUrl={previewUrl}
+                  />
+                ))}
 
               {/* SEO */}
               {activeSection === "seo" && site && (

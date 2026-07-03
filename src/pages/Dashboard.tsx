@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-toastify';
-import { Plus, Rocket } from 'lucide-react';
+import { Rocket } from 'lucide-react';
 import { getMySitesAPI, deleteSiteAPI, toggleStatusAPI } from '../api/site.api';
 import { AuthStore } from '../store/auth';
 import SiteCard from '../components/SiteCard';
@@ -55,12 +55,6 @@ export default function Dashboard() {
               Hey {user?.name} — {sites.length} site{sites.length !== 1 ? 's' : ''} deployed
             </p>
           </div>
-          <Link
-            to="/upload"
-            className="flex items-center gap-2 bg-primary text-white font-semibold px-6 py-3 rounded-xl hover:bg-primary-dark transition-colors"
-          >
-            <Plus size={16} /> New Site
-          </Link>
         </div>
 
         {loading ? (

@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
-import { Rocket, Package, FileText, Lock, X, CreditCard } from 'lucide-react';
-import { AnimatePresence } from 'framer-motion';
+import { Rocket, Package, FileText, Lock } from 'lucide-react';
 import { uploadZipAPI, uploadFilesAPI } from '../api/site.api';
 import { getPaymentInfoAPI } from '../api/payment.api';
 import FileUploader from '../components/FileUploader';
+import PaymentModal from '../components/PaymentModal';
 
 const FREE_UPLOAD_LIMIT = 5 * 1024 * 1024; // 5 MB
 
@@ -74,6 +74,26 @@ export default function Upload() {
       }
     }
 
+    await performDeploy();
+  };
+
+  // Called from the payment modal after the user finishes checkout in the other tab
+  const handlePaidAndDeploy = async () => {
+    try {
+      const info = await getPaymentInfoAPI();
+      if ((info.data.data.credits || 0) < 1) {
+        toast.error("Payment not verified yet — finish checkout in the other tab, then complete the verification page.");
+        return;
+      }
+    } catch {
+      toast.error('Could not check payment status — try again');
+      return;
+    }
+    setPayModalOpen(false);
+    await performDeploy();
+  };
+
+  const performDeploy = async () => {
     setUploading(true);
     try {
       let res;
@@ -202,57 +222,14 @@ export default function Upload() {
         </motion.div>
       </div>
 
-      {/* Large upload payment modal */}
-      <AnimatePresence>
-        {payModalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-6"
-            onClick={() => setPayModalOpen(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 relative"
-            >
-              <button
-                onClick={() => setPayModalOpen(false)}
-                className="absolute top-4 right-4 text-slate-400 hover:text-slate-700"
-              >
-                <X size={18} />
-              </button>
-
-              <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center mb-5">
-                <Lock size={22} />
-              </div>
-
-              <h2 className="font-bebas text-3xl text-slate-900 mb-2">Large Upload</h2>
-              <p className="text-slate-500 text-sm leading-relaxed mb-2">
-                Your upload is <strong>{(totalSize / 1024 / 1024).toFixed(1)} MB</strong> — uploads over 5 MB require a one-time large-upload credit.
-              </p>
-              <p className="text-slate-500 text-sm leading-relaxed mb-6">
-                After payment you'll be redirected back automatically, and your credit will be applied to this account.
-              </p>
-
-              <a
-                href={checkoutUrl || '#'}
-                onClick={() => setPayModalOpen(false)}
-                className="w-full flex items-center justify-center gap-2 bg-primary text-white font-semibold py-3.5 rounded-xl hover:bg-primary-dark transition-colors text-sm"
-              >
-                <CreditCard size={16} /> Pay ₹199.99 & Unlock
-              </a>
-
-              <p className="text-xs text-slate-400 text-center mt-4">
-                Secure checkout via Lemon Squeezy. One credit = one deploy over 5 MB.
-              </p>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <PaymentModal
+        open={payModalOpen}
+        onClose={() => setPayModalOpen(false)}
+        totalSize={totalSize}
+        checkoutUrl={checkoutUrl}
+        onPaidConfirm={handlePaidAndDeploy}
+        busy={uploading}
+      />
     </div>
   );
 }

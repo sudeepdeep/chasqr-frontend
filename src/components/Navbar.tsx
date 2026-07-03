@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { LayoutDashboard, Rocket, LogOut, Shield } from 'lucide-react';
+import { LayoutDashboard, Rocket, LogOut, Shield, Receipt } from 'lucide-react';
 import { AuthStore, clearAuth } from '../store/auth';
 
 export default function Navbar() {
@@ -33,6 +33,13 @@ export default function Navbar() {
               >
                 <LayoutDashboard size={15} />
                 Dashboard
+              </Link>
+              <Link
+                to="/transactions"
+                className="flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-primary transition-colors"
+              >
+                <Receipt size={15} />
+                Transactions
               </Link>
               {user.role === 'admin' && (
                 <Link

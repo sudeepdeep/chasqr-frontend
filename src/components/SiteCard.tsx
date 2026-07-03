@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, Layers, Pencil, ExternalLink, Pause, Play, Trash2, Calendar, Check, X } from 'lucide-react';
+import { Eye, Layers, Pencil, ExternalLink, Pause, Play, Trash2, Calendar, Check, X, Crown } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { renameSiteAPI } from '../api/site.api';
 
@@ -115,11 +115,21 @@ export default function SiteCard({ site, onDelete, onToggle, onRename }: Props) 
             </div>
           )}
 
-          <span className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${
-            isActive ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-500'
-          }`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-green-500' : 'bg-slate-400'}`} />
-            {site.status}
+          <span className="flex items-center gap-1.5 shrink-0">
+            {site.plan === 'paid' && (
+              <span
+                title="PRO site — unlimited upload size"
+                className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-700 border border-amber-300"
+              >
+                <Crown size={11} className="fill-amber-500 text-amber-500" /> PRO
+              </span>
+            )}
+            <span className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
+              isActive ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-500'
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-green-500' : 'bg-slate-400'}`} />
+              {site.status}
+            </span>
           </span>
         </div>
 

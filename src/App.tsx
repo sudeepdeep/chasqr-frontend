@@ -14,6 +14,7 @@ import Upload from './pages/Upload';
 import SiteAdmin from './pages/SiteAdmin';
 import AdminPanel from './pages/AdminPanel';
 import VerifyTransaction from './pages/VerifyTransaction';
+import Transactions from './pages/Transactions';
 import ProtectedRoute from './components/ProtectedRoute';
 
 const router = createBrowserRouter([
@@ -37,6 +38,14 @@ const router = createBrowserRouter([
       {
         path: '/sites/:siteId',
         element: <ProtectedRoute><SiteAdmin /></ProtectedRoute>,
+      },
+      {
+        path: '/transactions',
+        element: <ProtectedRoute><Transactions /></ProtectedRoute>,
+      },
+      {
+        path: '/verify-transaction',
+        element: <ProtectedRoute><VerifyTransaction /></ProtectedRoute>,
       },
       {
         path: '/verify-transaction/:orderId',
