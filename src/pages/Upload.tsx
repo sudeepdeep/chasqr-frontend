@@ -2,9 +2,13 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
-import { Rocket, Package, FileText } from 'lucide-react';
+import { Rocket, Package, FileText, Lock, X, CreditCard } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 import { uploadZipAPI, uploadFilesAPI } from '../api/site.api';
+import { getPaymentInfoAPI } from '../api/payment.api';
 import FileUploader from '../components/FileUploader';
+
+const FREE_UPLOAD_LIMIT = 5 * 1024 * 1024; // 5 MB
 
 const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
@@ -42,10 +46,33 @@ export default function Upload() {
 
   const hasSelection = selectedZip !== null || selectedFiles.length > 0;
 
+  // Payment gate for uploads > 5MB
+  const [payModalOpen, setPayModalOpen] = useState(false);
+  const [checkoutUrl, setCheckoutUrl] = useState('');
+
+  const totalSize = selectedZip
+    ? selectedZip.size
+    : selectedFiles.reduce((acc, f) => acc + f.size, 0);
+  const isLargeUpload = totalSize > FREE_UPLOAD_LIMIT;
+
   const handleDeploy = async () => {
     if (!siteName.trim()) { toast.error('Please enter a site name'); return; }
     if (!hasSelection) { toast.error('Please select a file or folder to upload'); return; }
     if (slugError) { toast.error(slugError); return; }
+
+    // Large uploads need a credit — check before wasting bandwidth
+    if (isLargeUpload) {
+      try {
+        const info = await getPaymentInfoAPI();
+        if ((info.data.data.credits || 0) < 1) {
+          setCheckoutUrl(info.data.data.checkoutUrl);
+          setPayModalOpen(true);
+          return;
+        }
+      } catch {
+        // fall through — backend will still enforce with a 402
+      }
+    }
 
     setUploading(true);
     try {
@@ -68,7 +95,15 @@ export default function Upload() {
       toast.success('Site deployed!');
       navigate(`/sites/${site.siteId}`);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Upload failed');
+      if (err.response?.status === 402) {
+        try {
+          const info = await getPaymentInfoAPI();
+          setCheckoutUrl(info.data.data.checkoutUrl);
+        } catch { /* modal still opens with fallback message */ }
+        setPayModalOpen(true);
+      } else {
+        toast.error(err.response?.data?.message || 'Upload failed');
+      }
     } finally {
       setUploading(false);
     }
@@ -82,7 +117,7 @@ export default function Upload() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="font-bebas text-5xl text-slate-900 mb-2">Deploy A Site</h1>
           <p className="text-slate-500 text-sm mb-10">
-            Upload a ZIP of your project or select individual files. Your site goes live instantly — connect your own custom domain anytime after deploying.
+            Upload a ZIP of your project or select individual files — plain HTML/CSS/JS or a built React/Vue/Svelte app (your <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">build</code> / <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">dist</code> folder). Goes live instantly, custom domain anytime.
           </p>
 
           {/* Site Name */}
@@ -136,12 +171,17 @@ export default function Upload() {
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
-              className="mb-6 bg-primary-light border border-primary/20 rounded-xl p-4 text-sm text-primary flex items-center gap-2"
+              className="mb-6 bg-primary-light border border-primary/20 rounded-xl p-4 text-sm text-primary flex items-center gap-2 flex-wrap"
             >
               {selectedZip
                 ? <><Package size={16} /><strong>{selectedZip.name}</strong> — {(selectedZip.size / 1024).toFixed(1)} KB</>
-                : <><FileText size={16} /><strong>{selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''}</strong> selected</>
+                : <><FileText size={16} /><strong>{selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''}</strong> selected — {(totalSize / 1024).toFixed(1)} KB</>
               }
+              {isLargeUpload && (
+                <span className="flex items-center gap-1 ml-auto text-xs font-semibold bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full">
+                  <Lock size={11} /> Over 5 MB — paid upload
+                </span>
+              )}
             </motion.div>
           )}
 
@@ -157,10 +197,62 @@ export default function Upload() {
           </button>
 
           <p className="text-xs text-slate-400 text-center mt-4">
-            Your site must contain an <code className="bg-slate-100 px-1 rounded">index.html</code> at the root level.
+            Your site must contain an <code className="bg-slate-100 px-1 rounded">index.html</code> at the root level. Uploads up to 5 MB are free.
           </p>
         </motion.div>
       </div>
+
+      {/* Large upload payment modal */}
+      <AnimatePresence>
+        {payModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-6"
+            onClick={() => setPayModalOpen(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 relative"
+            >
+              <button
+                onClick={() => setPayModalOpen(false)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-slate-700"
+              >
+                <X size={18} />
+              </button>
+
+              <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center mb-5">
+                <Lock size={22} />
+              </div>
+
+              <h2 className="font-bebas text-3xl text-slate-900 mb-2">Large Upload</h2>
+              <p className="text-slate-500 text-sm leading-relaxed mb-2">
+                Your upload is <strong>{(totalSize / 1024 / 1024).toFixed(1)} MB</strong> — uploads over 5 MB require a one-time large-upload credit.
+              </p>
+              <p className="text-slate-500 text-sm leading-relaxed mb-6">
+                After payment you'll be redirected back automatically, and your credit will be applied to this account.
+              </p>
+
+              <a
+                href={checkoutUrl || '#'}
+                onClick={() => setPayModalOpen(false)}
+                className="w-full flex items-center justify-center gap-2 bg-primary text-white font-semibold py-3.5 rounded-xl hover:bg-primary-dark transition-colors text-sm"
+              >
+                <CreditCard size={16} /> Pay ₹199.99 & Unlock
+              </a>
+
+              <p className="text-xs text-slate-400 text-center mt-4">
+                Secure checkout via Lemon Squeezy. One credit = one deploy over 5 MB.
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

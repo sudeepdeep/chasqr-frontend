@@ -19,7 +19,7 @@ const features = [
   {
     icon: <Zap size={24} />,
     title: "Instant Deploy",
-    desc: "Upload a ZIP or your HTML files and go live in seconds. No config, no CLI, no build steps.",
+    desc: "Upload a ZIP or files — plain HTML or a built React/Vue app — and go live in seconds. No config, no CLI.",
   },
   {
     icon: <Globe size={24} />,

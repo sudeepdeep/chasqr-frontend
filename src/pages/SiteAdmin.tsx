@@ -789,9 +789,11 @@ export default function SiteAdmin() {
                       <p className="text-slate-600 font-medium">
                         No editable content found
                       </p>
-                      <p className="text-slate-400 text-sm mt-1">
-                        Your HTML file may use only div containers with no
-                        direct text leaves.
+                      <p className="text-slate-400 text-sm mt-1 max-w-md mx-auto">
+                        JS-rendered apps (React, Vue, etc.) build their pages
+                        at runtime, so their content can't be edited here.
+                        Hosting, custom domains, SEO, and analytics still work
+                        — update content by redeploying a new build.
                       </p>
                     </div>
                   ) : (
