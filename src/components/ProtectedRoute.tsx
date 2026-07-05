@@ -4,13 +4,15 @@ import { AuthStore } from '../store/auth';
 interface Props {
   children: React.ReactNode;
   adminOnly?: boolean;
+  expertOnly?: boolean;
 }
 
-export default function ProtectedRoute({ children, adminOnly = false }: Props) {
+export default function ProtectedRoute({ children, adminOnly = false, expertOnly = false }: Props) {
   const { user } = AuthStore.useState();
 
   if (!user) return <Navigate to="/login" replace />;
   if (adminOnly && user.role !== 'admin') return <Navigate to="/dashboard" replace />;
+  if (expertOnly && user.role !== 'expert' && user.role !== 'admin') return <Navigate to="/dashboard" replace />;
 
   return <>{children}</>;
 }

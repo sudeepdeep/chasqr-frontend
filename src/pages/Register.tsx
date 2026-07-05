@@ -9,13 +9,18 @@ import { setAuth } from '../store/auth';
 export default function Register() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!acceptedTerms) {
+      toast.error('Please accept the Terms and Conditions to continue');
+      return;
+    }
     setLoading(true);
     try {
-      const res = await registerAPI(form);
+      const res = await registerAPI({ ...form, acceptedTerms });
       setAuth(res.data.data.user, res.data.data.token);
       toast.success('Account created!');
       navigate('/dashboard');
@@ -105,9 +110,28 @@ export default function Register() {
                 className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               />
             </div>
+            <label className="flex items-start gap-2.5 text-xs text-slate-500 leading-relaxed cursor-pointer">
+              <input
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary shrink-0"
+              />
+              <span>
+                I agree to the{' '}
+                <Link to="/terms" target="_blank" className="text-primary hover:underline">
+                  Terms and Conditions
+                </Link>{' '}
+                and{' '}
+                <Link to="/privacy" target="_blank" className="text-primary hover:underline">
+                  Privacy Policy
+                </Link>
+              </span>
+            </label>
+
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !acceptedTerms}
               className="w-full bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary-dark transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading && <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full inline-block" />}
@@ -116,7 +140,14 @@ export default function Register() {
           </form>
         </div>
 
-        <p className="text-center text-sm text-slate-500 mt-6">
+        <p className="text-center text-xs text-slate-400 mt-4">
+          By continuing with Google, you also agree to our{' '}
+          <Link to="/terms" target="_blank" className="text-primary hover:underline">Terms</Link>
+          {' '}and{' '}
+          <Link to="/privacy" target="_blank" className="text-primary hover:underline">Privacy Policy</Link>.
+        </p>
+
+        <p className="text-center text-sm text-slate-500 mt-4">
           Already have an account?{' '}
           <Link to="/login" className="text-primary font-medium hover:underline">
             Sign in

@@ -1,6 +1,6 @@
 import api from './axios';
 
-export const registerAPI = (data: { name: string; email: string; password: string }) =>
+export const registerAPI = (data: { name: string; email: string; password: string; acceptedTerms: boolean }) =>
   api.post('/api/auth/register', data);
 
 export const loginAPI = (data: { email: string; password: string }) =>

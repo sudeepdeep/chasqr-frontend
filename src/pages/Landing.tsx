@@ -14,12 +14,13 @@ import {
   Sparkles,
 } from "lucide-react";
 import { AuthStore } from "../store/auth";
+import StorageNoticeBanner from "../components/StorageNoticeBanner";
 
 const features = [
   {
     icon: <Zap size={24} />,
     title: "Instant Deploy",
-    desc: "Upload a ZIP or files — plain HTML or a built React/Vue app — and go live in seconds. No config, no CLI.",
+    desc: "Upload a ZIP or files — plain HTML or a built React/Angular/Vue app — and go live in seconds. No config, no CLI.",
   },
   {
     icon: <Globe size={24} />,
@@ -318,7 +319,14 @@ export default function Landing() {
           CHASQR
         </span>
         © {new Date().getFullYear()} — Deploy fast, iterate faster.
+        <div className="mt-2 flex items-center justify-center gap-4 text-xs">
+          <Link to="/docs" className="hover:text-primary transition-colors">Docs</Link>
+          <Link to="/terms" className="hover:text-primary transition-colors">Terms</Link>
+          <Link to="/privacy" className="hover:text-primary transition-colors">Privacy</Link>
+        </div>
       </footer>
+
+      <StorageNoticeBanner />
     </div>
   );
 }

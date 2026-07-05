@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-toastify";
 import {
@@ -20,6 +20,7 @@ import {
   ArrowUp,
   Palette,
   Crown,
+  Headset,
 } from "lucide-react";
 import {
   getSiteAPI,
@@ -30,6 +31,7 @@ import {
   setCustomDomainAPI,
   removeCustomDomainAPI,
   updateElementsAPI,
+  upgradeSiteAPI,
 } from "../api/site.api";
 import ContentEditor from "../components/ContentEditor";
 import AnalyticsChart from "../components/AnalyticsChart";
@@ -37,6 +39,8 @@ import SEOEditor from "../components/SEOEditor";
 import ColorEditor from "../components/ColorEditor";
 import FaviconEditor from "../components/FaviconEditor";
 import PaymentModal from "../components/PaymentModal";
+import SupportSection from "../components/SupportSection";
+import SourceArchiveControl from "../components/SourceArchiveControl";
 import { getPaymentInfoAPI } from "../api/payment.api";
 
 const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
@@ -60,7 +64,8 @@ type Section =
   | "editor"
   | "colors"
   | "seo"
-  | "analytics";
+  | "analytics"
+  | "support";
 
 const NAV_GROUPS: {
   label: string;
@@ -83,16 +88,36 @@ const NAV_GROUPS: {
       { id: "analytics", label: "Analytics", icon: BarChart3 },
     ],
   },
+  {
+    label: "Help",
+    items: [{ id: "support", label: "Expert Help", icon: Headset }],
+  },
 ];
+
+const VALID_SECTIONS = new Set<Section>(
+  NAV_GROUPS.flatMap((g) => g.items.map((i) => i.id)),
+);
 
 export default function SiteAdmin() {
   const { siteId } = useParams<{ siteId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [site, setSite] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activePage, setActivePage] = useState(0);
   const [pendingEdits, setPendingEdits] = useState<Record<string, string>>({});
-  const [activeSection, setActiveSection] = useState<Section>("editor");
+  const tabParam = searchParams.get("tab") as Section | null;
+  const [activeSection, setActiveSectionState] = useState<Section>(
+    tabParam && VALID_SECTIONS.has(tabParam) ? tabParam : "editor",
+  );
+  const setActiveSection = (section: Section) => {
+    setActiveSectionState(section);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("tab", section);
+      return next;
+    }, { replace: true });
+  };
   const [showTopBtn, setShowTopBtn] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
 
@@ -119,6 +144,11 @@ export default function SiteAdmin() {
   // Large redeploy payment gate
   const [payModalOpen, setPayModalOpen] = useState(false);
   const [payCheckoutUrl, setPayCheckoutUrl] = useState("");
+
+  // Direct "Upgrade to PRO" payment gate
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [upgradeCheckoutUrl, setUpgradeCheckoutUrl] = useState("");
+  const [upgrading, setUpgrading] = useState(false);
 
   const hasChanges = Object.keys(pendingEdits).length > 0;
   const previewUrl = site ? `${BASE_URL}/sites/${site.slug}/` : "";
@@ -263,6 +293,54 @@ export default function SiteAdmin() {
     }
   };
 
+  const handleUpgradeClick = async () => {
+    if (!siteId) return;
+    setUpgrading(true);
+    try {
+      await performUpgrade();
+    } finally {
+      setUpgrading(false);
+    }
+  };
+
+  const performUpgrade = async () => {
+    if (!siteId) return;
+    try {
+      const res = await upgradeSiteAPI(siteId);
+      setSite(res.data.data.site);
+      setUpgradeModalOpen(false);
+      toast.success("Site upgraded to PRO!");
+    } catch (err: any) {
+      if (err.response?.status === 402) {
+        try {
+          const info = await getPaymentInfoAPI();
+          setUpgradeCheckoutUrl(info.data.data.checkoutUrl);
+        } catch { /* modal opens regardless */ }
+        setUpgradeModalOpen(true);
+      } else {
+        toast.error(err.response?.data?.message || "Upgrade failed");
+      }
+    }
+  };
+
+  const handlePaidAndUpgrade = async () => {
+    setUpgrading(true);
+    try {
+      const info = await getPaymentInfoAPI();
+      if ((info.data.data.credits || 0) < 1) {
+        toast.error(
+          "Payment not verified yet — finish checkout in the other tab, then complete the verification page.",
+        );
+        return;
+      }
+      await performUpgrade();
+    } catch {
+      toast.error("Could not check payment status — try again");
+    } finally {
+      setUpgrading(false);
+    }
+  };
+
   const handleDomainSave = async () => {
     if (!siteId || !domainValue.trim()) return;
     setDomainSaving(true);
@@ -369,7 +447,7 @@ export default function SiteAdmin() {
             transition={{ type: "spring", stiffness: 400, damping: 30 }}
             className="fixed top-16 left-0 right-0 z-40 bg-primary shadow-lg"
           >
-            <div className="max-w-6xl mx-auto px-6 h-12 flex items-center justify-between">
+            <div className="max-w-[1400px] mx-auto px-6 h-12 flex items-center justify-between">
               <span className="text-white text-sm font-medium">
                 {Object.keys(pendingEdits).length} unsaved change
                 {Object.keys(pendingEdits).length !== 1 ? "s" : ""}
@@ -410,6 +488,17 @@ export default function SiteAdmin() {
         confirmLabel="I've paid — redeploy now"
       />
 
+      {/* Direct "Upgrade to PRO" payment modal */}
+      <PaymentModal
+        open={upgradeModalOpen}
+        onClose={() => setUpgradeModalOpen(false)}
+        checkoutUrl={upgradeCheckoutUrl}
+        onPaidConfirm={handlePaidAndUpgrade}
+        busy={upgrading}
+        confirmLabel="I've paid — upgrade now"
+        title="Upgrade to PRO"
+      />
+
       {/* Back to top */}
       <AnimatePresence>
         {showTopBtn && (
@@ -426,7 +515,7 @@ export default function SiteAdmin() {
         )}
       </AnimatePresence>
 
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-[1400px] mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -482,6 +571,20 @@ export default function SiteAdmin() {
                   <Eye size={14} /> Preview Changes
                 </button>
               )} */}
+              {site.plan !== "paid" && (
+                <button
+                  onClick={handleUpgradeClick}
+                  disabled={upgrading}
+                  className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-yellow-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:from-amber-600 hover:to-yellow-600 transition-colors disabled:opacity-60"
+                >
+                  {upgrading ? (
+                    <span className="animate-spin w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full inline-block" />
+                  ) : (
+                    <Crown size={14} className="fill-white" />
+                  )}
+                  Upgrade to PRO
+                </button>
+              )}
               <a
                 href={previewUrl}
                 target="_blank"
@@ -833,6 +936,16 @@ export default function SiteAdmin() {
                 </div>
               )}
 
+              {activeSection === "files" && siteId && (
+                <div className="mt-6">
+                  <SourceArchiveControl
+                    siteId={siteId}
+                    hasSourceArchive={site.hasSourceArchive}
+                    onChange={setSite}
+                  />
+                </div>
+              )}
+
               {/* Editor */}
               {activeSection === "editor" && (
                 <div>
@@ -938,6 +1051,11 @@ export default function SiteAdmin() {
               {/* Analytics */}
               {activeSection === "analytics" && siteId && (
                 <AnalyticsChart siteId={siteId} />
+              )}
+
+              {/* Expert Help */}
+              {activeSection === "support" && siteId && (
+                <SupportSection siteId={siteId} hasSourceArchive={site.hasSourceArchive} />
               )}
             </div>
           </div>

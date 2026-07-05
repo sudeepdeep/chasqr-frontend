@@ -23,6 +23,17 @@ export const getColorsAPI = (siteId: string, page: string) =>
 export const updateColorsAPI = (siteId: string, page: string, replacements: Record<string, string>) =>
   api.put(`/api/sites/${siteId}/colors`, { page, replacements });
 
+export const upgradeSiteAPI = (siteId: string) =>
+  api.put(`/api/sites/${siteId}/upgrade`);
+
+export const uploadSourceArchiveAPI = (siteId: string, formData: FormData) =>
+  api.post(`/api/sites/${siteId}/source`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+
+export const removeSourceArchiveAPI = (siteId: string) =>
+  api.delete(`/api/sites/${siteId}/source`);
+
 export const updateElementsAPI = (
   siteId: string,
   page: string,

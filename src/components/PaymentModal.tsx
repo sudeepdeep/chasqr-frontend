@@ -1,15 +1,18 @@
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Lock, X, CreditCard, Rocket } from "lucide-react";
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  totalSize: number;
+  /** Upload size in bytes — omit for a generic upgrade (no upload context). */
+  totalSize?: number;
   checkoutUrl: string;
   onPaidConfirm: () => void;
   busy?: boolean;
   confirmLabel?: string;
+  title?: string;
 }
 
 export default function PaymentModal({
@@ -20,6 +23,7 @@ export default function PaymentModal({
   onPaidConfirm,
   busy,
   confirmLabel = "I've paid — deploy now",
+  title = "Large Upload",
 }: Props) {
   const handledRef = useRef(false);
 
@@ -68,7 +72,7 @@ export default function PaymentModal({
       bc?.close();
     };
   }, [open, onPaidConfirm]);
-  return (
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -97,14 +101,23 @@ export default function PaymentModal({
             </div>
 
             <h2 className="font-bebas text-3xl text-slate-900 mb-2">
-              Large Upload
+              {title}
             </h2>
             <p className="text-slate-500 text-sm leading-relaxed mb-2">
-              Your upload is{" "}
-              <strong>{(totalSize / 1024 / 1024).toFixed(1)} MB</strong> —
-              uploads over 5 MB require a one-time payment. Once paid, this
-              site is upgraded to <strong className="text-amber-600">PRO</strong>{" "}
-              and can be redeployed at any size, forever.
+              {totalSize !== undefined ? (
+                <>
+                  Your upload is{" "}
+                  <strong>{(totalSize / 1024 / 1024).toFixed(1)} MB</strong> —
+                  uploads over 5 MB require a one-time payment. Once paid, this
+                  site is upgraded to <strong className="text-amber-600">PRO</strong>{" "}
+                  and can be redeployed at any size, forever.
+                </>
+              ) : (
+                <>
+                  Upgrading this site to <strong className="text-amber-600">PRO</strong> requires
+                  a one-time payment. Once paid, it can be redeployed at any size, forever.
+                </>
+              )}
             </p>
             <p className="text-slate-500 text-sm leading-relaxed mb-6">
               Checkout opens in a <strong>secure popup</strong>. After payment
@@ -140,6 +153,7 @@ export default function PaymentModal({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }

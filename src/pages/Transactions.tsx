@@ -35,7 +35,7 @@ export default function Transactions() {
 
   return (
     <div className="min-h-screen bg-white pt-24 pb-16 px-6">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-[900px] mx-auto">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           {/* Breadcrumb */}
           <div className="flex items-center gap-1.5 text-sm text-slate-400 mb-6">

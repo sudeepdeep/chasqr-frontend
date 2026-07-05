@@ -7,6 +7,9 @@ import AppLayout from './layout/AppLayout';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Docs from './pages/Docs';
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
@@ -15,6 +18,7 @@ import SiteAdmin from './pages/SiteAdmin';
 import AdminPanel from './pages/AdminPanel';
 import VerifyTransaction from './pages/VerifyTransaction';
 import Transactions from './pages/Transactions';
+import ExpertPanel from './pages/ExpertPanel';
 import ProtectedRoute from './components/ProtectedRoute';
 
 const router = createBrowserRouter([
@@ -23,6 +27,9 @@ const router = createBrowserRouter([
     element: <AppLayout />,
     children: [
       { path: '/', element: <Landing /> },
+      { path: '/docs', element: <Docs /> },
+      { path: '/terms', element: <Terms /> },
+      { path: '/privacy', element: <Privacy /> },
       { path: '/login', element: <Login /> },
       { path: '/register', element: <Register /> },
       { path: '/forgot-password', element: <ForgotPassword /> },
@@ -50,6 +57,10 @@ const router = createBrowserRouter([
       {
         path: '/verify-transaction/:orderId',
         element: <ProtectedRoute><VerifyTransaction /></ProtectedRoute>,
+      },
+      {
+        path: '/expert',
+        element: <ProtectedRoute expertOnly><ExpertPanel /></ProtectedRoute>,
       },
       {
         path: '/admin',

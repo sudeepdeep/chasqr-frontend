@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Eye, Loader2 } from 'lucide-react';
 import { getPageHTMLAPI } from '../api/site.api';
@@ -90,7 +91,7 @@ export default function PreviewModal({ open, onClose, siteId, page, edits, baseU
     return () => { document.body.style.overflow = original; };
   }, [open]);
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -133,6 +134,7 @@ export default function PreviewModal({ open, onClose, siteId, page, edits, baseU
           </div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }

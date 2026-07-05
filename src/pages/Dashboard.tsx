@@ -47,7 +47,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-white pt-24 pb-16 px-6">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-[1300px] mx-auto">
         <div className="flex items-center justify-between mb-10">
           <div>
             <h1 className="font-bebas text-5xl text-slate-900">Your Sites</h1>

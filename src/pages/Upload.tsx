@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
 import { Rocket, Package, FileText, Lock } from 'lucide-react';
@@ -137,7 +137,7 @@ export default function Upload() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="font-bebas text-5xl text-slate-900 mb-2">Deploy A Site</h1>
           <p className="text-slate-500 text-sm mb-10">
-            Upload a ZIP of your project or select individual files — plain HTML/CSS/JS or a built React/Vue/Svelte app (your <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">build</code> / <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">dist</code> folder). Goes live instantly, custom domain anytime.
+            Upload a ZIP of your project or select individual files — plain HTML/CSS/JS or a built React/Angular/Vue/Svelte app (your <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">build</code> / <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">dist</code> folder). Goes live instantly, custom domain anytime. See the <Link to="/docs" className="text-primary hover:underline">docs</Link> for framework-specific steps.
           </p>
 
           {/* Site Name */}
