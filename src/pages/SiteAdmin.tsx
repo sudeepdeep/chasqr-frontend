@@ -21,6 +21,7 @@ import {
   Palette,
   Crown,
   Headset,
+  Lock,
 } from "lucide-react";
 import {
   getSiteAPI,
@@ -41,6 +42,7 @@ import FaviconEditor from "../components/FaviconEditor";
 import PaymentModal from "../components/PaymentModal";
 import SupportSection from "../components/SupportSection";
 import SourceArchiveControl from "../components/SourceArchiveControl";
+import ProLockedGate from "../components/ProLockedGate";
 import { getPaymentInfoAPI } from "../api/payment.api";
 
 const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
@@ -628,6 +630,10 @@ export default function SiteAdmin() {
                           {item.id === "domain" && site.customDomain && (
                             <span className="w-1.5 h-1.5 rounded-full bg-green-500 ml-auto" />
                           )}
+                          {(item.id === "domain" || item.id === "support") &&
+                            site.plan !== "paid" && (
+                              <Lock size={11} className="text-amber-400 ml-auto" />
+                            )}
                         </button>
                       );
                     })}
@@ -723,6 +729,14 @@ export default function SiteAdmin() {
 
               {/* Custom Domain */}
               {activeSection === "domain" && (
+                site.plan !== "paid" ? (
+                  <ProLockedGate
+                    title="Custom Domain — PRO Feature"
+                    description="Connect your own domain with free automatic SSL. Upgrade this site to PRO to unlock it, along with expert support and unlimited upload size."
+                    onUpgradeClick={handleUpgradeClick}
+                    upgrading={upgrading}
+                  />
+                ) : (
                 <div className="p-5 bg-slate-50 rounded-xl border border-slate-200">
                   <h2 className="font-bebas text-2xl text-slate-900 mb-1">
                     Custom Domain
@@ -814,6 +828,7 @@ export default function SiteAdmin() {
                     </div>
                   )}
                 </div>
+                )
               )}
 
               {/* Update Files */}
@@ -938,11 +953,20 @@ export default function SiteAdmin() {
 
               {activeSection === "files" && siteId && (
                 <div className="mt-6">
-                  <SourceArchiveControl
-                    siteId={siteId}
-                    hasSourceArchive={site.hasSourceArchive}
-                    onChange={setSite}
-                  />
+                  {site.plan !== "paid" ? (
+                    <ProLockedGate
+                      title="Attach Source Code — PRO Feature"
+                      description="Let experts receive your real project source (not just build output) when you request support. Upgrade this site to PRO to unlock it, along with a custom domain and unlimited upload size."
+                      onUpgradeClick={handleUpgradeClick}
+                      upgrading={upgrading}
+                    />
+                  ) : (
+                    <SourceArchiveControl
+                      siteId={siteId}
+                      hasSourceArchive={site.hasSourceArchive}
+                      onChange={setSite}
+                    />
+                  )}
                 </div>
               )}
 
@@ -1055,7 +1079,16 @@ export default function SiteAdmin() {
 
               {/* Expert Help */}
               {activeSection === "support" && siteId && (
-                <SupportSection siteId={siteId} hasSourceArchive={site.hasSourceArchive} />
+                site.plan !== "paid" ? (
+                  <ProLockedGate
+                    title="Expert Help — PRO Feature"
+                    description="Chat with a verified expert and get changes made for you. Upgrade this site to PRO to unlock it, along with a custom domain and unlimited upload size."
+                    onUpgradeClick={handleUpgradeClick}
+                    upgrading={upgrading}
+                  />
+                ) : (
+                  <SupportSection siteId={siteId} hasSourceArchive={site.hasSourceArchive} />
+                )
               )}
             </div>
           </div>

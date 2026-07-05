@@ -59,7 +59,9 @@ export default function PaymentModal({
       bc.onmessage = (e) => {
         if (e.data?.type === "chasqr:payment-verified") handleVerified();
       };
-    } catch { /* BroadcastChannel unsupported — manual button still works */ }
+    } catch {
+      /* BroadcastChannel unsupported — manual button still works */
+    }
 
     const onMessage = (e: MessageEvent) => {
       if (e.origin !== window.location.origin) return;
@@ -87,7 +89,7 @@ export default function PaymentModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 relative"
+            className="bg-white rounded-2xl shadow-2xl max-w-[40rem] w-full p-8 relative"
           >
             <button
               onClick={onClose}
@@ -100,22 +102,25 @@ export default function PaymentModal({
               <Lock size={22} />
             </div>
 
-            <h2 className="font-bebas text-3xl text-slate-900 mb-2">
-              {title}
-            </h2>
+            <h2 className="font-bebas text-3xl text-slate-900 mb-2">{title}</h2>
             <p className="text-slate-500 text-sm leading-relaxed mb-2">
               {totalSize !== undefined ? (
                 <>
                   Your upload is{" "}
                   <strong>{(totalSize / 1024 / 1024).toFixed(1)} MB</strong> —
                   uploads over 5 MB require a one-time payment. Once paid, this
-                  site is upgraded to <strong className="text-amber-600">PRO</strong>{" "}
-                  and can be redeployed at any size, forever.
+                  site is upgraded to{" "}
+                  <strong className="text-amber-600">PRO</strong> and can be
+                  redeployed at any size, forever.
                 </>
               ) : (
                 <>
-                  Upgrading this site to <strong className="text-amber-600">PRO</strong> requires
-                  a one-time payment. Once paid, it can be redeployed at any size, forever.
+                  Upgrading this site to{" "}
+                  <strong className="text-amber-600">PRO</strong> requires a
+                  one-time payment. Once paid, it unlocks a{" "}
+                  <strong>custom domain</strong>,{" "}
+                  <strong>expert support chat</strong>, and{" "}
+                  <strong>uploads of any size</strong> — forever, for this site.
                 </>
               )}
             </p>
