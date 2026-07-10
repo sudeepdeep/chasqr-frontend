@@ -7,10 +7,7 @@ import "react-toastify/dist/ReactToastify.css";
 
 const queryClient = new QueryClient();
 
-const root = ReactDOM.createRoot(
-  document.getElementById("root") as HTMLElement
-);
-root.render(
+const app = (
   <>
     <ToastContainer />
     <QueryClientProvider client={queryClient}>
@@ -18,3 +15,10 @@ root.render(
     </QueryClientProvider>
   </>
 );
+
+const rootElement = document.getElementById("root") as HTMLElement;
+if (rootElement.hasChildNodes()) {
+  ReactDOM.hydrateRoot(rootElement, app);
+} else {
+  ReactDOM.createRoot(rootElement).render(app);
+}
