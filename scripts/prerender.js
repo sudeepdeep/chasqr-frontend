@@ -49,12 +49,14 @@ async function launchBrowser() {
   // restricted containers. Locally (Windows/macOS dev machines) plain
   // puppeteer works fine and is simpler, so only switch on Vercel.
   if (process.env.VERCEL) {
-    const chromium = require("@sparticuz/chromium");
+    // @sparticuz/chromium is ESM-only; require() from this CJS script
+    // wraps its default export under `.default`.
+    const chromium = require("@sparticuz/chromium").default;
     const puppeteerCore = require("puppeteer-core");
     return puppeteerCore.launch({
       args: chromium.args,
       executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
+      headless: "shell",
     });
   }
   const puppeteer = require("puppeteer");
