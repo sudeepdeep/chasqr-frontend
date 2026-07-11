@@ -4,7 +4,6 @@
 const fs = require("fs");
 const path = require("path");
 const http = require("http");
-const puppeteer = require("puppeteer");
 
 const BUILD_DIR = path.join(__dirname, "..", "build");
 const PORT = 45123;
@@ -43,9 +42,28 @@ function startServer() {
   return new Promise((resolve) => server.listen(PORT, () => resolve(server)));
 }
 
+async function launchBrowser() {
+  // Vercel's build container is a stripped-down Linux image that's missing
+  // shared libraries (e.g. libnspr4.so) full puppeteer's bundled Chromium
+  // needs. @sparticuz/chromium ships a build made for exactly these
+  // restricted containers. Locally (Windows/macOS dev machines) plain
+  // puppeteer works fine and is simpler, so only switch on Vercel.
+  if (process.env.VERCEL) {
+    const chromium = require("@sparticuz/chromium");
+    const puppeteerCore = require("puppeteer-core");
+    return puppeteerCore.launch({
+      args: chromium.args,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+    });
+  }
+  const puppeteer = require("puppeteer");
+  return puppeteer.launch({ args: ["--no-sandbox"] });
+}
+
 async function main() {
   const server = await startServer();
-  const browser = await puppeteer.launch({ args: ["--no-sandbox"] });
+  const browser = await launchBrowser();
 
   try {
     for (const route of ROUTES) {
