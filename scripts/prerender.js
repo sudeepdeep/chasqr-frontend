@@ -13,6 +13,7 @@ const ROUTES = [
   "/login",
   "/register",
   "/docs",
+  "/seo-checker",
   "/terms",
   "/privacy",
   "/forgot-password",

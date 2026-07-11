@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { LayoutDashboard, Rocket, LogOut, Shield, Receipt, Headset, BookOpen } from 'lucide-react';
+import { LayoutDashboard, Rocket, LogOut, Shield, Receipt, Headset, BookOpen, Search } from 'lucide-react';
 import { AuthStore, clearAuth } from '../store/auth';
 import { getSocket } from '../lib/socket';
 import { getMyRequestsAPI } from '../api/support.api';
@@ -82,6 +82,10 @@ export default function Navbar() {
           <Link to="/docs" className={linkClass(pathname === '/docs')}>
             <BookOpen size={15} />
             Docs
+          </Link>
+          <Link to="/seo-checker" className={linkClass(pathname === '/seo-checker')}>
+            <Search size={15} />
+            SEO Checker
           </Link>
           {user ? (
             <>

@@ -22,6 +22,7 @@ import {
   Crown,
   Headset,
   Lock,
+  Search,
 } from "lucide-react";
 import {
   getSiteAPI,
@@ -37,6 +38,7 @@ import {
 import ContentEditor from "../components/ContentEditor";
 import AnalyticsChart from "../components/AnalyticsChart";
 import SEOEditor from "../components/SEOEditor";
+import SiteSeoChecker from "../components/SiteSeoChecker";
 import ColorEditor from "../components/ColorEditor";
 import FaviconEditor from "../components/FaviconEditor";
 import PaymentModal from "../components/PaymentModal";
@@ -69,6 +71,7 @@ type Section =
   | "editor"
   | "colors"
   | "seo"
+  | "seo-check"
   | "analytics"
   | "support";
 
@@ -90,6 +93,7 @@ const NAV_GROUPS: {
       { id: "editor", label: "Editor", icon: FileCode },
       { id: "colors", label: "Colors", icon: Palette },
       { id: "seo", label: "SEO", icon: Globe },
+      { id: "seo-check", label: "SEO Checker", icon: Search },
       { id: "analytics", label: "Analytics", icon: BarChart3 },
     ],
   },
@@ -153,11 +157,9 @@ export default function SiteAdmin() {
 
   // Large redeploy payment gate
   const [payModalOpen, setPayModalOpen] = useState(false);
-  const [payCheckoutUrl, setPayCheckoutUrl] = useState("");
 
   // Direct "Upgrade to PRO" payment gate
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
-  const [upgradeCheckoutUrl, setUpgradeCheckoutUrl] = useState("");
   const [upgrading, setUpgrading] = useState(false);
 
   const hasChanges = Object.keys(pendingEdits).length > 0;
@@ -275,7 +277,6 @@ export default function SiteAdmin() {
       try {
         const info = await getPaymentInfoAPI();
         if ((info.data.data.credits || 0) < 1) {
-          setPayCheckoutUrl(info.data.data.checkoutUrl);
           setPayModalOpen(true);
           return;
         }
@@ -287,19 +288,8 @@ export default function SiteAdmin() {
     await performRedeploy();
   };
 
+  // Called from the payment modal once Razorpay checkout is verified
   const handlePaidAndRedeploy = async () => {
-    try {
-      const info = await getPaymentInfoAPI();
-      if ((info.data.data.credits || 0) < 1) {
-        toast.error(
-          "Payment not verified yet — finish checkout in the other tab, then complete the verification page.",
-        );
-        return;
-      }
-    } catch {
-      toast.error("Could not check payment status — try again");
-      return;
-    }
     setPayModalOpen(false);
     await performRedeploy();
   };
@@ -326,10 +316,6 @@ export default function SiteAdmin() {
       toast.success("Site redeployed successfully!");
     } catch (err: any) {
       if (err.response?.status === 402) {
-        try {
-          const info = await getPaymentInfoAPI();
-          setPayCheckoutUrl(info.data.data.checkoutUrl);
-        } catch { /* modal opens regardless */ }
         setPayModalOpen(true);
       } else {
         toast.error(err.response?.data?.message || "Redeploy failed");
@@ -358,10 +344,6 @@ export default function SiteAdmin() {
       toast.success("Site upgraded to PRO!");
     } catch (err: any) {
       if (err.response?.status === 402) {
-        try {
-          const info = await getPaymentInfoAPI();
-          setUpgradeCheckoutUrl(info.data.data.checkoutUrl);
-        } catch { /* modal opens regardless */ }
         setUpgradeModalOpen(true);
       } else {
         toast.error(err.response?.data?.message || "Upgrade failed");
@@ -369,19 +351,11 @@ export default function SiteAdmin() {
     }
   };
 
+  // Called from the payment modal once Razorpay checkout is verified
   const handlePaidAndUpgrade = async () => {
     setUpgrading(true);
     try {
-      const info = await getPaymentInfoAPI();
-      if ((info.data.data.credits || 0) < 1) {
-        toast.error(
-          "Payment not verified yet — finish checkout in the other tab, then complete the verification page.",
-        );
-        return;
-      }
       await performUpgrade();
-    } catch {
-      toast.error("Could not check payment status — try again");
     } finally {
       setUpgrading(false);
     }
@@ -528,20 +502,14 @@ export default function SiteAdmin() {
         open={payModalOpen}
         onClose={() => setPayModalOpen(false)}
         totalSize={redeployTotalSize}
-        checkoutUrl={payCheckoutUrl}
         onPaidConfirm={handlePaidAndRedeploy}
-        busy={redeploying}
-        confirmLabel="I've paid — redeploy now"
       />
 
       {/* Direct "Upgrade to PRO" payment modal */}
       <PaymentModal
         open={upgradeModalOpen}
         onClose={() => setUpgradeModalOpen(false)}
-        checkoutUrl={upgradeCheckoutUrl}
         onPaidConfirm={handlePaidAndUpgrade}
-        busy={upgrading}
-        confirmLabel="I've paid — upgrade now"
         title="Upgrade to PRO"
       />
 
@@ -1119,6 +1087,11 @@ export default function SiteAdmin() {
                     }}
                   />
                 </>
+              )}
+
+              {/* SEO Checker */}
+              {activeSection === "seo-check" && site && (
+                <SiteSeoChecker siteId={site.siteId} pages={site.pages} />
               )}
 
               {/* Analytics */}

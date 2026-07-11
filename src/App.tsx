@@ -8,6 +8,7 @@ import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Docs from './pages/Docs';
+import SeoChecker from './pages/SeoChecker';
 import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
 import ForgotPassword from './pages/ForgotPassword';
@@ -16,7 +17,6 @@ import Dashboard from './pages/Dashboard';
 import Upload from './pages/Upload';
 import SiteAdmin from './pages/SiteAdmin';
 import AdminPanel from './pages/AdminPanel';
-import VerifyTransaction from './pages/VerifyTransaction';
 import Transactions from './pages/Transactions';
 import ExpertPanel from './pages/ExpertPanel';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -30,6 +30,7 @@ const router = createBrowserRouter([
     children: [
       { path: '/', element: <Landing /> },
       { path: '/docs', element: <Docs /> },
+      { path: '/seo-checker', element: <SeoChecker /> },
       { path: '/terms', element: <Terms /> },
       { path: '/privacy', element: <Privacy /> },
       { path: '/forgot-password', element: <ForgotPassword /> },
@@ -49,14 +50,6 @@ const router = createBrowserRouter([
       {
         path: '/transactions',
         element: <ProtectedRoute><Transactions /></ProtectedRoute>,
-      },
-      {
-        path: '/verify-transaction',
-        element: <ProtectedRoute><VerifyTransaction /></ProtectedRoute>,
-      },
-      {
-        path: '/verify-transaction/:orderId',
-        element: <ProtectedRoute><VerifyTransaction /></ProtectedRoute>,
       },
       {
         path: '/expert',

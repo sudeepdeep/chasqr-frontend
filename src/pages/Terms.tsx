@@ -19,7 +19,7 @@ const SECTIONS = [
   },
   {
     title: "5. Payments",
-    body: "Uploads over 5 MB require a one-time payment per site, processed securely through Lemon Squeezy. Once paid, that site can be redeployed at any size going forward. Payments are non-refundable except where required by law.",
+    body: "Uploads over 5 MB require a one-time payment per site, processed securely through Razorpay. Once paid, that site can be redeployed at any size going forward. Payments are non-refundable except where required by law.",
   },
   {
     title: "6. Expert Support",

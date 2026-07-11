@@ -48,7 +48,6 @@ export default function Upload() {
 
   // Payment gate for uploads > 5MB
   const [payModalOpen, setPayModalOpen] = useState(false);
-  const [checkoutUrl, setCheckoutUrl] = useState('');
 
   const totalSize = selectedZip
     ? selectedZip.size
@@ -65,7 +64,6 @@ export default function Upload() {
       try {
         const info = await getPaymentInfoAPI();
         if ((info.data.data.credits || 0) < 1) {
-          setCheckoutUrl(info.data.data.checkoutUrl);
           setPayModalOpen(true);
           return;
         }
@@ -77,18 +75,8 @@ export default function Upload() {
     await performDeploy();
   };
 
-  // Called from the payment modal after the user finishes checkout in the other tab
+  // Called from the payment modal once Razorpay checkout is verified
   const handlePaidAndDeploy = async () => {
-    try {
-      const info = await getPaymentInfoAPI();
-      if ((info.data.data.credits || 0) < 1) {
-        toast.error("Payment not verified yet — finish checkout in the other tab, then complete the verification page.");
-        return;
-      }
-    } catch {
-      toast.error('Could not check payment status — try again');
-      return;
-    }
     setPayModalOpen(false);
     await performDeploy();
   };
@@ -116,10 +104,6 @@ export default function Upload() {
       navigate(`/sites/${site.siteId}`);
     } catch (err: any) {
       if (err.response?.status === 402) {
-        try {
-          const info = await getPaymentInfoAPI();
-          setCheckoutUrl(info.data.data.checkoutUrl);
-        } catch { /* modal still opens with fallback message */ }
         setPayModalOpen(true);
       } else {
         toast.error(err.response?.data?.message || 'Upload failed');
@@ -226,9 +210,7 @@ export default function Upload() {
         open={payModalOpen}
         onClose={() => setPayModalOpen(false)}
         totalSize={totalSize}
-        checkoutUrl={checkoutUrl}
         onPaidConfirm={handlePaidAndDeploy}
-        busy={uploading}
       />
     </div>
   );

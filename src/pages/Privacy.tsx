@@ -15,7 +15,7 @@ const SECTIONS = [
   },
   {
     title: "4. Third-Party Services",
-    body: "We use MongoDB Atlas for data storage, Resend for transactional email, Lemon Squeezy for payment processing, and Google for optional sign-in. Each provider processes data under its own privacy policy.",
+    body: "We use MongoDB Atlas for data storage, Resend for transactional email, Razorpay for payment processing, and Google for optional sign-in. Each provider processes data under its own privacy policy.",
   },
   {
     title: "5. Expert Support & Code Sharing",
