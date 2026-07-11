@@ -14,6 +14,8 @@ import {
 } from "../api/support.api";
 import { redeployZipAPI } from "../api/site.api";
 import SupportChat from "../components/SupportChat";
+import { getSocket } from "../lib/socket";
+import { SupportUnreadStore, clearUnread, setOpenSupportRequest } from "../store/supportUnread";
 
 const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
@@ -21,11 +23,12 @@ interface Req {
   _id: string;
   siteId: string;
   topic: string;
-  status: string;
+  status: string; 
   codeShared: boolean;
   deployAccess: boolean;
   userId: { _id: string; name: string; email: string };
   created_at: string;
+  lastMessage?: { text: string; created_at: string } | null;
 }
 
 const STATUS_GROUPS: { key: string; label: string; filter: (r: Req) => boolean }[] = [
@@ -36,6 +39,7 @@ const STATUS_GROUPS: { key: string; label: string; filter: (r: Req) => boolean }
 
 export default function ExpertPanel() {
   const { user } = AuthStore.useState();
+  const { unreadByRequest } = SupportUnreadStore.useState();
   const [requests, setRequests] = useState<Req[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -56,13 +60,47 @@ export default function ExpertPanel() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Live-refresh the sidebar when a customer opens a new request, instead of
+  // only picking it up on the next page load.
+  useEffect(() => {
+    const socket = getSocket();
+    const onNewRequest = () => {
+      toast.info("New support request received");
+      load();
+    };
+    socket.on("new-request", onNewRequest);
+    return () => { socket.off("new-request", onNewRequest); };
+  }, [load]);
+
+  // Keep each sidebar row's preview text current as messages come in,
+  // regardless of which conversation is currently open.
+  useEffect(() => {
+    const socket = getSocket();
+    const onMessage = (msg: any) => {
+      setRequests((prev) =>
+        prev.map((r) =>
+          r._id === msg.requestId
+            ? { ...r, lastMessage: { text: msg.text, created_at: msg.created_at } }
+            : r,
+        ),
+      );
+    };
+    socket.on("message", onMessage);
+    return () => { socket.off("message", onMessage); };
+  }, []);
+
   const openRequest = useCallback((id: string) => {
     setActiveId(id);
     setActiveDetail(null);
+    setOpenSupportRequest(id);
+    clearUnread(id);
     getSupportRequestAPI(id)
       .then((res) => setActiveDetail(res.data.data))
       .catch(() => toast.error("Failed to load request"));
   }, []);
+
+  // Stop attributing incoming messages to "currently open" once we navigate away.
+  useEffect(() => () => setOpenSupportRequest(null), []);
 
   // Auto-select the first request once loaded (nice default like a chat app)
   useEffect(() => {
@@ -195,7 +233,16 @@ export default function ExpertPanel() {
                               : "bg-slate-300"
                             }`} />
                           </div>
-                          <p className="text-xs text-slate-500 truncate">{r.topic}</p>
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs text-slate-500 truncate">
+                              {r.lastMessage?.text || r.topic}
+                            </p>
+                            {!!unreadByRequest[r._id] && (
+                              <span className="shrink-0 min-w-[16px] h-4 px-1 flex items-center justify-center bg-primary text-white text-[10px] font-semibold rounded-full">
+                                {unreadByRequest[r._id] > 9 ? "9+" : unreadByRequest[r._id]}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-[10px] text-slate-400 font-mono mt-0.5">{r.siteId}</p>
                         </button>
                       ))}

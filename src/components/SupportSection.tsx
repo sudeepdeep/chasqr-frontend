@@ -33,9 +33,12 @@ interface SupportRequest {
 interface Props {
   siteId: string;
   hasSourceArchive?: boolean;
+  /** Fired whenever the active request changes, so a parent (e.g. SiteAdmin)
+   *  can keep a socket subscription alive for it even on other tabs. */
+  onActiveRequestChange?: (id: string | null) => void;
 }
 
-export default function SupportSection({ siteId, hasSourceArchive }: Props) {
+export default function SupportSection({ siteId, hasSourceArchive, onActiveRequestChange }: Props) {
   const [experts, setExperts] = useState<Expert[]>([]);
   const [requests, setRequests] = useState<SupportRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,6 +63,11 @@ export default function SupportSection({ siteId, hasSourceArchive }: Props) {
 
   const activeRequest = requests.find((r) => ["pending", "accepted"].includes(r.status));
   const pastRequests = requests.filter((r) => ["completed", "cancelled"].includes(r.status));
+
+  useEffect(() => {
+    onActiveRequestChange?.(activeRequest?._id || null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRequest?._id]);
 
   const handlePickExpert = (ex: Expert) => {
     setSelectedExpert(ex);

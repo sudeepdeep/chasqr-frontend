@@ -1,7 +1,11 @@
+import { useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { LayoutDashboard, Rocket, LogOut, Shield, Receipt, Headset, BookOpen } from 'lucide-react';
 import { AuthStore, clearAuth } from '../store/auth';
+import { getSocket } from '../lib/socket';
+import { getMyRequestsAPI } from '../api/support.api';
+import { SupportUnreadStore, incrementUnread, totalUnread } from '../store/supportUnread';
 
 const linkClass = (active: boolean) =>
   `flex items-center gap-1.5 text-sm font-medium transition-colors ${
@@ -10,6 +14,8 @@ const linkClass = (active: boolean) =>
 
 export default function Navbar() {
   const { user } = AuthStore.useState();
+  const unreadState = SupportUnreadStore.useState();
+  const expertUnread = totalUnread(unreadState);
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
@@ -17,6 +23,48 @@ export default function Navbar() {
     clearAuth();
     navigate('/');
   };
+
+  // Experts can have several conversations going at once — join every open
+  // request's room (not just whichever one is open in the Expert Panel) so
+  // unread counts keep accumulating no matter what page the expert is on.
+  useEffect(() => {
+    if (!user || user.role !== 'expert') return;
+    const socket = getSocket();
+    const joinedIds = new Set<string>();
+
+    const joinOpenRequests = () => {
+      getMyRequestsAPI()
+        .then((res) => {
+          res.data.data.requests
+            .filter((r: any) => ['pending', 'accepted'].includes(r.status))
+            .forEach((r: any) => {
+              if (!joinedIds.has(r._id)) {
+                socket.emit('join', r._id);
+                joinedIds.add(r._id);
+              }
+            });
+        })
+        .catch(() => {});
+    };
+
+    joinOpenRequests();
+    socket.on('connect', joinOpenRequests);
+    socket.on('new-request', joinOpenRequests);
+
+    const onMessage = (msg: any) => {
+      const { openRequestId } = SupportUnreadStore.getRawState();
+      if (msg.senderId?._id !== user.id && msg.requestId !== openRequestId) {
+        incrementUnread(msg.requestId);
+      }
+    };
+    socket.on('message', onMessage);
+
+    return () => {
+      socket.off('connect', joinOpenRequests);
+      socket.off('new-request', joinOpenRequests);
+      socket.off('message', onMessage);
+    };
+  }, [user]);
 
   return (
     <motion.nav
@@ -46,9 +94,14 @@ export default function Navbar() {
                 Transactions
               </Link>
               {user.role === 'expert' && (
-                <Link to="/expert" className={linkClass(pathname === '/expert')}>
+                <Link to="/expert" className={`${linkClass(pathname === '/expert')} relative`}>
                   <Headset size={15} />
                   Expert Panel
+                  {expertUnread > 0 && (
+                    <span className="absolute -top-2 -right-3 min-w-[16px] h-4 px-1 flex items-center justify-center bg-primary text-white text-[10px] font-semibold rounded-full">
+                      {expertUnread > 9 ? '9+' : expertUnread}
+                    </span>
+                  )}
                 </Link>
               )}
               {user.role === 'admin' && (

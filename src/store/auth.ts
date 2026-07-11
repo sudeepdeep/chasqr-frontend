@@ -1,4 +1,5 @@
 import { Store } from 'pullstate';
+import { resetSupportUnread } from './supportUnread';
 
 interface User {
   id: string;
@@ -33,4 +34,5 @@ export const clearAuth = () => {
   localStorage.removeItem('chasqr_token');
   localStorage.removeItem('chasqr_user');
   AuthStore.update((s) => { s.user = null; s.token = null; });
+  resetSupportUnread();
 };

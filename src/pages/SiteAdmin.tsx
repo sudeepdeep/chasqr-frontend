@@ -44,6 +44,9 @@ import SupportSection from "../components/SupportSection";
 import SourceArchiveControl from "../components/SourceArchiveControl";
 import ProLockedGate from "../components/ProLockedGate";
 import { getPaymentInfoAPI } from "../api/payment.api";
+import { getMyRequestsAPI } from "../api/support.api";
+import { getSocket } from "../lib/socket";
+import { AuthStore } from "../store/auth";
 
 const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
@@ -102,6 +105,7 @@ const VALID_SECTIONS = new Set<Section>(
 
 export default function SiteAdmin() {
   const { siteId } = useParams<{ siteId: string }>();
+  const { user } = AuthStore.useState();
   const [searchParams, setSearchParams] = useSearchParams();
   const [site, setSite] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -112,8 +116,12 @@ export default function SiteAdmin() {
   const [activeSection, setActiveSectionState] = useState<Section>(
     tabParam && VALID_SECTIONS.has(tabParam) ? tabParam : "editor",
   );
+  const activeSectionRef = useRef(activeSection);
+  const [unreadSupportCount, setUnreadSupportCount] = useState(0);
   const setActiveSection = (section: Section) => {
     setActiveSectionState(section);
+    activeSectionRef.current = section;
+    if (section === "support") setUnreadSupportCount(0);
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.set("tab", section);
@@ -167,6 +175,42 @@ export default function SiteAdmin() {
       .catch(() => toast.error("Failed to load site"))
       .finally(() => setLoading(false));
   }, [siteId]);
+
+  // Find this site's active support request (if any) so we can listen for
+  // expert replies even while the customer is on a different tab.
+  const [activeSupportRequestId, setActiveSupportRequestId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!siteId) return;
+    getMyRequestsAPI()
+      .then((res) => {
+        const active = res.data.data.requests.find(
+          (r: any) => r.siteId === siteId && ["pending", "accepted"].includes(r.status),
+        );
+        setActiveSupportRequestId(active?._id || null);
+      })
+      .catch(() => {});
+  }, [siteId]);
+
+  useEffect(() => {
+    if (!activeSupportRequestId) return;
+    const socket = getSocket();
+    const joinRoom = () => socket.emit("join", activeSupportRequestId);
+    joinRoom();
+    socket.on("connect", joinRoom);
+
+    const onMessage = (msg: any) => {
+      if (msg.senderId?._id !== user?.id && activeSectionRef.current !== "support") {
+        setUnreadSupportCount((c) => c + 1);
+      }
+    };
+    socket.on("message", onMessage);
+
+    return () => {
+      socket.emit("leave", activeSupportRequestId);
+      socket.off("connect", joinRoom);
+      socket.off("message", onMessage);
+    };
+  }, [activeSupportRequestId, user?.id]);
 
   useEffect(() => {
     const onScroll = () => setShowTopBtn(window.scrollY > 400);
@@ -630,6 +674,11 @@ export default function SiteAdmin() {
                           {item.id === "domain" && site.customDomain && (
                             <span className="w-1.5 h-1.5 rounded-full bg-green-500 ml-auto" />
                           )}
+                          {item.id === "support" && site.plan === "paid" && unreadSupportCount > 0 && (
+                            <span className="ml-auto min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-primary text-white text-[10px] font-semibold rounded-full">
+                              {unreadSupportCount > 9 ? "9+" : unreadSupportCount}
+                            </span>
+                          )}
                           {(item.id === "domain" || item.id === "support") &&
                             site.plan !== "paid" && (
                               <Lock size={11} className="text-amber-400 ml-auto" />
@@ -1087,7 +1136,11 @@ export default function SiteAdmin() {
                     upgrading={upgrading}
                   />
                 ) : (
-                  <SupportSection siteId={siteId} hasSourceArchive={site.hasSourceArchive} />
+                  <SupportSection
+                    siteId={siteId}
+                    hasSourceArchive={site.hasSourceArchive}
+                    onActiveRequestChange={setActiveSupportRequestId}
+                  />
                 )
               )}
             </div>

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
 import { Lock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { resetPasswordAPI } from '../api/auth.api';
+import PasswordInput from '../components/PasswordInput';
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -115,16 +116,13 @@ export default function ResetPassword() {
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 New Password
               </label>
-              <div className="relative">
-                <Lock size={16} className="absolute left-3 top-3 text-slate-400" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="At least 8 characters"
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
-                />
-              </div>
+              <PasswordInput
+                leftIcon={<Lock size={16} className="absolute left-3 top-3 text-slate-400" />}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="At least 8 characters"
+                className="w-full pl-10 pr-10 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
+              />
               {password && (
                 <p className={`text-xs mt-1 ${password.length >= 8 ? 'text-green-600' : 'text-orange-600'}`}>
                   {password.length >= 8 ? '✓ Strong' : `${password.length}/8 characters`}
@@ -136,16 +134,13 @@ export default function ResetPassword() {
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Confirm Password
               </label>
-              <div className="relative">
-                <Lock size={16} className="absolute left-3 top-3 text-slate-400" />
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Repeat your password"
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
-                />
-              </div>
+              <PasswordInput
+                leftIcon={<Lock size={16} className="absolute left-3 top-3 text-slate-400" />}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Repeat your password"
+                className="w-full pl-10 pr-10 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
+              />
               {confirmPassword && password !== confirmPassword && (
                 <p className="text-xs text-red-600 mt-1">Passwords do not match</p>
               )}

@@ -72,6 +72,7 @@ export default function SupportChat({
   const [sharing, setSharing] = useState(false);
   const [completing, setCompleting] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const isClosed = ["completed", "cancelled"].includes(requestStatus);
 
@@ -85,7 +86,13 @@ export default function SupportChat({
   useEffect(() => {
     loadMessages();
     const socket = getSocket();
-    socket.emit("join", requestId);
+
+    // Room membership lives on the server connection, not the client — if the
+    // socket ever reconnects (server restart, network blip), we've silently
+    // fallen out of the room unless we rejoin on every "connect", not just once.
+    const joinRoom = () => socket.emit("join", requestId);
+    joinRoom();
+    socket.on("connect", joinRoom);
 
     const onMessage = (msg: Msg) => {
       setMessages((prev) =>
@@ -99,6 +106,7 @@ export default function SupportChat({
 
     return () => {
       socket.emit("leave", requestId);
+      socket.off("connect", joinRoom);
       socket.off("message", onMessage);
       socket.off("request-updated", onRequestUpdatedEvt);
     };
@@ -113,6 +121,7 @@ export default function SupportChat({
     const t = text.trim();
     if (!t || isClosed) return;
     setText("");
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
 
     const socket = getSocket();
     if (socket.connected) {
@@ -295,13 +304,24 @@ export default function SupportChat({
             This conversation is closed.
           </p>
         ) : (
-          <div className="flex gap-2">
-            <input
+          <div className="flex gap-2 items-end">
+            <textarea
+              ref={textareaRef}
               value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) handleSend(); }}
-              placeholder="Type a message..."
-              className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+              onChange={(e) => {
+                setText(e.target.value);
+                e.target.style.height = "auto";
+                e.target.style.height = `${Math.min(e.target.scrollHeight, 128)}px`;
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              placeholder="Type a message... (Shift+Enter for a new line)"
+              rows={1}
+              className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary text-sm resize-none max-h-32 overflow-y-auto"
             />
             <button
               onClick={handleSend}
