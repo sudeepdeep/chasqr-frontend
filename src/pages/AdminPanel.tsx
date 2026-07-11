@@ -80,7 +80,7 @@ export default function AdminPanel() {
 
   return (
     <div className="min-h-screen bg-white pt-24 pb-16 px-6">
-      <div className="max-w-[1400px] mx-auto">
+      <div className="max-w-[1300px] mx-auto">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="font-bebas text-5xl text-slate-900 mb-8">Admin Panel</h1>
 

@@ -135,7 +135,7 @@ export default function SeoChecker() {
           </div>
 
           {showCta && (
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1">`
               <div className="lg:sticky lg:top-24 relative overflow-hidden bg-slate-900 rounded-2xl p-6">
                 <div className="absolute -top-16 -right-16 w-56 h-56 bg-primary/30 rounded-full blur-3xl pointer-events-none" />
                 <div className="relative">

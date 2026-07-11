@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import { Lock, X, CreditCard } from "lucide-react";
 import { createPaymentOrderAPI, verifyOrderAPI } from "../api/payment.api";
 import { loadRazorpayScript } from "../lib/razorpay";
+import { loadCashfreeScript } from "../lib/cashfree";
 
 interface Props {
   open: boolean;
@@ -24,15 +25,37 @@ export default function PaymentModal({
 }: Props) {
   const [paying, setPaying] = useState(false);
 
+  const handleVerified = () => {
+    toast.success("Payment verified — unlocked!");
+    onPaidConfirm();
+  };
+
   const handlePay = async () => {
     setPaying(true);
     try {
-      await loadRazorpayScript();
       const res = await createPaymentOrderAPI();
-      const { orderId, amount, currency, keyId, name, email } = res.data.data;
+      const { orderId, amount, currency, checkout, name, email } = res.data.data;
 
+      // Which gateway this is comes entirely from the backend (PAYMENT_PROVIDER
+      // env var) — this branch is the only place the frontend cares which one.
+      if (checkout.provider === "cashfree") {
+        await loadCashfreeScript();
+        const cashfree = new window.Cashfree({ mode: checkout.mode });
+        await cashfree.checkout({ paymentSessionId: checkout.paymentSessionId, redirectTarget: "_modal" });
+        try {
+          await verifyOrderAPI({ cashfree_order_id: orderId });
+          handleVerified();
+        } catch (err: any) {
+          toast.error(err.response?.data?.message || "Payment verification failed");
+        } finally {
+          setPaying(false);
+        }
+        return;
+      }
+
+      await loadRazorpayScript();
       const razorpay = new window.Razorpay({
-        key: keyId,
+        key: checkout.keyId,
         amount,
         currency,
         order_id: orderId,
@@ -43,8 +66,7 @@ export default function PaymentModal({
         handler: async (response) => {
           try {
             await verifyOrderAPI(response);
-            toast.success("Payment verified — unlocked!");
-            onPaidConfirm();
+            handleVerified();
           } catch (err: any) {
             toast.error(err.response?.data?.message || "Payment verification failed");
           } finally {
@@ -127,7 +149,7 @@ export default function PaymentModal({
             </button>
 
             <p className="text-xs text-slate-400 text-center mt-4">
-              Secure checkout via Razorpay. One payment = this site unlocked forever.
+              Secure checkout. One payment = this site unlocked forever.
             </p>
           </motion.div>
         </motion.div>

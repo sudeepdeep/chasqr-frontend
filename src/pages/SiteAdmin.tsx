@@ -467,7 +467,7 @@ export default function SiteAdmin() {
             transition={{ type: "spring", stiffness: 400, damping: 30 }}
             className="fixed top-16 left-0 right-0 z-40 bg-primary shadow-lg"
           >
-            <div className="max-w-[1400px] mx-auto px-6 h-12 flex items-center justify-between">
+            <div className="max-w-[1300px] mx-auto px-6 h-12 flex items-center justify-between">
               <span className="text-white text-sm font-medium">
                 {Object.keys(pendingEdits).length} unsaved change
                 {Object.keys(pendingEdits).length !== 1 ? "s" : ""}
@@ -529,7 +529,7 @@ export default function SiteAdmin() {
         )}
       </AnimatePresence>
 
-      <div className="max-w-[1400px] mx-auto">
+      <div className="max-w-[1300px] mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
