@@ -33,6 +33,13 @@ export const getMessagesAPI = (id: string) =>
 export const sendMessageAPI = (id: string, text: string) =>
   api.post(`/api/support/requests/${id}/messages`, { text });
 
+export const sendImageMessageAPI = (id: string, file: File, caption?: string) => {
+  const fd = new FormData();
+  fd.append("file", file);
+  if (caption) fd.append("text", caption);
+  return api.post(`/api/support/requests/${id}/messages/image`, fd);
+};
+
 export const shareCodeAPI = (id: string) =>
   api.post(`/api/support/requests/${id}/share-code`);
 

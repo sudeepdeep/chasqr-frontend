@@ -2,7 +2,8 @@ import api from "./axios";
 
 export const getPaymentInfoAPI = () => api.get("/api/payments/info");
 
-export const createPaymentOrderAPI = () => api.post("/api/payments/create-order");
+export const createPaymentOrderAPI = (provider: "razorpay" | "cashfree") =>
+  api.post("/api/payments/create-order", { provider });
 
 // Payload shape differs per provider — Razorpay verifies a signed triple
 // client-side, Cashfree just needs the order id (we re-check status server-side).

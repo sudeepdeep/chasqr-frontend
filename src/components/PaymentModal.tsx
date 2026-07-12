@@ -24,6 +24,7 @@ export default function PaymentModal({
   title = "Large Upload",
 }: Props) {
   const [paying, setPaying] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<"razorpay" | "cashfree">("razorpay");
 
   const handleVerified = () => {
     toast.success("Payment verified — unlocked!");
@@ -33,11 +34,17 @@ export default function PaymentModal({
   const handlePay = async () => {
     setPaying(true);
     try {
-      const res = await createPaymentOrderAPI();
-      const { orderId, amount, currency, checkout, name, email } = res.data.data;
+      const res = await createPaymentOrderAPI(selectedProvider);
+      const { orderId, amount, currency, checkout, name, email, fellBack } = res.data.data;
 
-      // Which gateway this is comes entirely from the backend (PAYMENT_PROVIDER
-      // env var) — this branch is the only place the frontend cares which one.
+      if (fellBack) {
+        toast.info(
+          `${selectedProvider === "razorpay" ? "Razorpay" : "Cashfree"} is unavailable right now — using ${checkout.provider === "razorpay" ? "Razorpay" : "Cashfree"} instead.`,
+        );
+      }
+
+      // Which gateway actually handles this can differ from what was selected
+      // (fallback may have kicked in) — always trust checkout.provider, not selectedProvider.
       if (checkout.provider === "cashfree") {
         await loadCashfreeScript();
         const cashfree = new window.Cashfree({ mode: checkout.mode });
@@ -134,6 +141,29 @@ export default function PaymentModal({
                 </>
               )}
             </p>
+
+            <div className="flex gap-3 mb-5">
+              {(["razorpay", "cashfree"] as const).map((p) => (
+                <label
+                  key={p}
+                  className={`flex-1 flex items-center gap-2.5 border rounded-xl px-4 py-3 text-sm font-medium cursor-pointer transition-colors ${
+                    selectedProvider === p
+                      ? "border-primary bg-primary-light text-primary"
+                      : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="payment-provider"
+                    value={p}
+                    checked={selectedProvider === p}
+                    onChange={() => setSelectedProvider(p)}
+                    className="accent-primary"
+                  />
+                  {p === "razorpay" ? "Razorpay" : "Cashfree"}
+                </label>
+              ))}
+            </div>
 
             <button
               onClick={handlePay}

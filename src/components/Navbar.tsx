@@ -125,6 +125,17 @@ export default function Navbar() {
                 <Rocket size={14} />
                 Deploy
               </Link>
+              <Link
+                to="/profile"
+                title="My Profile"
+                className={`w-8 h-8 rounded-full flex items-center justify-center font-bebas text-sm shrink-0 transition-colors ${
+                  pathname === '/profile'
+                    ? 'bg-primary text-white'
+                    : 'bg-primary-light text-primary hover:bg-primary hover:text-white'
+                }`}
+              >
+                {user.name?.[0]?.toUpperCase() || '?'}
+              </Link>
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors"

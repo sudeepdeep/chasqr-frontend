@@ -8,6 +8,9 @@ interface User {
   role: 'user' | 'admin' | 'expert';
   plan: 'free' | 'paid';
   status: string;
+  email_verified: boolean;
+  mfaEnabled: boolean;
+  created_at: string;
 }
 
 interface AuthState {

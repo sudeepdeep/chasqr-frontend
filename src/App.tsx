@@ -14,6 +14,7 @@ import Privacy from './pages/Privacy';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
+import Profile from './pages/Profile';
 import Upload from './pages/Upload';
 import SiteAdmin from './pages/SiteAdmin';
 import AdminPanel from './pages/AdminPanel';
@@ -38,6 +39,10 @@ const router = createBrowserRouter([
       {
         path: '/dashboard',
         element: <ProtectedRoute><Dashboard /></ProtectedRoute>,
+      },
+      {
+        path: '/profile',
+        element: <ProtectedRoute><Profile /></ProtectedRoute>,
       },
       {
         path: '/upload',

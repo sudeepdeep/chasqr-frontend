@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import { toast } from 'react-toastify';
-import { loginAPI, googleAuthAPI } from '../api/auth.api';
+import { loginAPI, googleAuthAPI, verifyLoginMfaAPI, resendLoginMfaAPI } from '../api/auth.api';
 import { setAuth } from '../store/auth';
 import AuthSplitLayout from '../layout/AuthSplitLayout';
 import PasswordInput from '../components/PasswordInput';
@@ -12,7 +12,7 @@ export default function Login() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
-  const [awaitingOtp, setAwaitingOtp] = useState(false);
+  const [otpContext, setOtpContext] = useState<'none' | 'verify-email' | 'mfa'>('none');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,8 +22,11 @@ export default function Login() {
       setAuth(res.data.data.user, res.data.data.token);
       navigate('/dashboard');
     } catch (err: any) {
-      if (err.response?.data?.code === 'EMAIL_NOT_VERIFIED') {
-        setAwaitingOtp(true);
+      const code = err.response?.data?.code;
+      if (code === 'EMAIL_NOT_VERIFIED') {
+        setOtpContext('verify-email');
+      } else if (code === 'MFA_REQUIRED') {
+        setOtpContext('mfa');
       } else {
         toast.error(err.response?.data?.message || 'Login failed');
       }
@@ -55,11 +58,14 @@ export default function Login() {
       topLinkLabel="Create an account"
       topLinkTo="/register"
     >
-      {awaitingOtp ? (
+      {otpContext !== 'none' ? (
         <EmailOtpVerify
           email={form.email}
           onVerified={handleVerified}
-          onBack={() => setAwaitingOtp(false)}
+          onBack={() => setOtpContext('none')}
+          {...(otpContext === 'mfa'
+            ? { verify: verifyLoginMfaAPI, resend: resendLoginMfaAPI, title: "Confirm it's you" }
+            : {})}
         />
       ) : (
       <>
