@@ -2,4 +2,4 @@
 User-agent: *
 Disallow:
 
-Sitemap: https://chasqr.com/sitemap.xml
+Sitemap: https://www.chasqr.com/sitemap.xml
