@@ -27,6 +27,10 @@ const MIME_TYPES = {
   ".png": "image/png",
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon",
+  ".gif": "image/gif",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
 };
 
 function startServer() {

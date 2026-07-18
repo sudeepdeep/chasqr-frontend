@@ -1,0 +1,78 @@
+.glass {
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+.glass-dark {
+  background: rgba(20, 17, 33, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.liquid-glass {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.05)
+  );
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.liquid-glass2 {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.05)
+  );
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.blob-shape {
+  border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%;
+  filter: blur(40px);
+}
+
+.distorted-text {
+  filter: url(#liquid-distortion);
+}
+
+.glass-card {
+  background: rgba(108, 71, 194, 0.05);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(108, 71, 194, 0.2);
+}
+
+.glow-effect {
+  box-shadow: 0 0 40px rgba(108, 71, 194, 0.3);
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0px);
+  }
+}
+.listener-card {
+  animation:
+    fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both,
+    float 4s ease-in-out 0.8s infinite;
+}

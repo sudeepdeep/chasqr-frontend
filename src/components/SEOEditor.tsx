@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
 import { Globe, Eye, Share2, Save } from 'lucide-react';
 import { updateSEOAPI } from '../api/site.api';
+import { APP_DOMAIN } from '../lib/siteUrl';
 
 interface Page {
   filename: string;
@@ -15,11 +16,12 @@ interface Page {
 
 interface Props {
   siteId: string;
+  siteSlug?: string;
   pages: Page[];
   onSaveSuccess?: (updatedPages: Page[]) => void;
 }
 
-export default function SEOEditor({ siteId, pages, onSaveSuccess }: Props) {
+export default function SEOEditor({ siteId, siteSlug, pages, onSaveSuccess }: Props) {
   const [selectedPage, setSelectedPage] = useState(0);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -207,7 +209,7 @@ export default function SEOEditor({ siteId, pages, onSaveSuccess }: Props) {
                 {formData.title || '(No title)'}
               </p>
               <p className="text-green-700 text-xs truncate">
-                chasqr.com/sites/{currentPage.filename}
+                {siteSlug || siteId}.{APP_DOMAIN}/{currentPage.filename}
               </p>
               <p className="text-slate-600 text-xs leading-relaxed line-clamp-2">
                 {formData.metaDescription || '(No meta description)'}

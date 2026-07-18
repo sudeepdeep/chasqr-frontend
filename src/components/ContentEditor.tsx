@@ -11,6 +11,9 @@ import {
   Copy,
   Trash2,
   Upload,
+  Plus,
+  Check,
+  X,
 } from "lucide-react";
 import PreviewModal from "./PreviewModal";
 import { uploadAssetAPI } from "../api/site.api";
@@ -21,6 +24,7 @@ interface ContentItem {
   value: string;
   type: "text" | "image" | "link";
   hidden?: boolean;
+  href?: string;
 }
 
 export type ElementAction = {
@@ -40,6 +44,12 @@ interface Props {
   previewOpen?: boolean;
   onPreviewOpenChange?: (open: boolean) => void;
   onElementsAction?: (actions: ElementAction[]) => Promise<void>;
+  onAddElement?: (
+    afterKey: string,
+    type: "text" | "image" | "link",
+    value: string,
+    href?: string,
+  ) => Promise<void>;
 }
 
 const typeIcon = {
@@ -62,6 +72,7 @@ export default function ContentEditor({
   previewOpen: externalPreviewOpen,
   onPreviewOpenChange,
   onElementsAction,
+  onAddElement,
 }: Props) {
   const [localEdits, setLocalEdits] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState<"all" | "text" | "image" | "link">(
@@ -70,6 +81,59 @@ export default function ContentEditor({
   const [localPreviewOpen, setLocalPreviewOpen] = useState(false);
   const [actionBusyKey, setActionBusyKey] = useState<string | null>(null);
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
+
+  // Inline "add element after this one" form state
+  const [addAfterKey, setAddAfterKey] = useState<string | null>(null);
+  const [addType, setAddType] = useState<"text" | "image" | "link">("text");
+  const [addValue, setAddValue] = useState("");
+  const [addHref, setAddHref] = useState("");
+  const [addBusy, setAddBusy] = useState(false);
+  const [addUploading, setAddUploading] = useState(false);
+  const addImageInputRef = useRef<HTMLInputElement>(null);
+
+  const openAddForm = (key: string) => {
+    setAddAfterKey(key);
+    setAddType("text");
+    setAddValue("");
+    setAddHref("");
+  };
+  const cancelAddForm = () => {
+    setAddAfterKey(null);
+    setAddValue("");
+    setAddHref("");
+  };
+  const submitAddForm = async (afterKey: string) => {
+    if (!onAddElement) return;
+    if (!addValue.trim()) {
+      toast.error(addType === "image" ? "Enter an image URL" : "Enter some content");
+      return;
+    }
+    setAddBusy(true);
+    try {
+      await onAddElement(afterKey, addType, addValue.trim(), addType === "link" ? addHref.trim() : undefined);
+      cancelAddForm();
+    } finally {
+      setAddBusy(false);
+    }
+  };
+  // Upload a local image for the add-element form → fills the Image URL field.
+  const handleAddImageFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !siteId) return;
+    setAddUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await uploadAssetAPI(siteId, fd);
+      setAddValue(res.data.data.path);
+      toast.success("Image uploaded — add to deploy");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Upload failed");
+    } finally {
+      setAddUploading(false);
+    }
+  };
   const imageInputRef = useRef<HTMLInputElement>(null);
   const uploadTargetKey = useRef<string | null>(null);
   const previewOpen = externalPreviewOpen ?? localPreviewOpen;
@@ -202,7 +266,8 @@ export default function ContentEditor({
             className={`p-4 rounded-xl border transition-colors ${
               item.hidden
                 ? "border-slate-200 bg-slate-50 opacity-70"
-                : edits[item.key] !== undefined
+                : edits[item.key] !== undefined ||
+                    edits[`${item.key}::href`] !== undefined
                   ? "border-primary/30 bg-primary-light"
                   : "border-slate-200 bg-white"
             }`}
@@ -255,6 +320,22 @@ export default function ContentEditor({
                   </button>
                 </span>
               )}
+
+              {onAddElement && (
+                <button
+                  onClick={() =>
+                    addAfterKey === item.key ? cancelAddForm() : openAddForm(item.key)
+                  }
+                  title="Add a new element below this one"
+                  className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${onElementsAction ? "ml-1" : "ml-2"} ${
+                    addAfterKey === item.key
+                      ? "text-primary bg-primary-light"
+                      : "text-slate-400 hover:text-primary hover:bg-primary-light"
+                  }`}
+                >
+                  <Plus size={15} />
+                </button>
+              )}
             </div>
 
             {item.type === "text" && item.value.length > 80 ? (
@@ -289,6 +370,36 @@ export default function ContentEditor({
                   </button>
                 )}
               </div>
+            ) : item.type === "link" ? (
+              <div className="space-y-2">
+                <div>
+                  <span className="text-xs text-slate-400 mb-1 block">Text</span>
+                  <input
+                    type="text"
+                    value={getValue(item)}
+                    onChange={(e) => handleChange(item.key, e.target.value)}
+                    placeholder="Link text"
+                    className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
+                  />
+                </div>
+                <div>
+                  <span className="text-xs text-slate-400 mb-1 block">URL</span>
+                  <div className="relative">
+                    <Link2 size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={
+                        edits[`${item.key}::href`] !== undefined
+                          ? edits[`${item.key}::href`]
+                          : item.href ?? ""
+                      }
+                      onChange={(e) => handleChange(`${item.key}::href`, e.target.value)}
+                      placeholder="https://example.com"
+                      className="w-full text-sm border border-slate-200 rounded-lg pl-8 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
             ) : (
               <input
                 type="text"
@@ -296,6 +407,102 @@ export default function ContentEditor({
                 onChange={(e) => handleChange(item.key, e.target.value)}
                 className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
               />
+            )}
+
+            {/* Inline "add a new element below this one" form */}
+            {onAddElement && addAfterKey === item.key && (
+              <div className="mt-3 pt-3 border-t border-dashed border-primary/30 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-slate-500">Add below:</span>
+                  {(["text", "image", "link"] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setAddType(t)}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                        addType === t
+                          ? "bg-primary text-white"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      {typeIcon[t]} {typeLabel[t]}
+                    </button>
+                  ))}
+                </div>
+
+                {addType === "text" ? (
+                  <textarea
+                    value={addValue}
+                    onChange={(e) => setAddValue(e.target.value)}
+                    rows={2}
+                    placeholder="Text to show"
+                    className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none bg-white"
+                  />
+                ) : addType === "image" ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={addValue}
+                      onChange={(e) => setAddValue(e.target.value)}
+                      placeholder="Image URL or upload a file"
+                      className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
+                    />
+                    {siteId && (
+                      <button
+                        onClick={() => addImageInputRef.current?.click()}
+                        disabled={addUploading}
+                        title="Upload an image from your device"
+                        className="flex items-center gap-1.5 shrink-0 border border-slate-200 text-slate-600 text-sm font-medium px-3 py-2 rounded-lg hover:bg-slate-50 hover:text-primary transition-colors disabled:opacity-50"
+                      >
+                        {addUploading ? (
+                          <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full" />
+                        ) : (
+                          <Upload size={14} />
+                        )}
+                        Upload
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={addValue}
+                      onChange={(e) => setAddValue(e.target.value)}
+                      placeholder="Link text"
+                      className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
+                    />
+                    <input
+                      type="text"
+                      value={addHref}
+                      onChange={(e) => setAddHref(e.target.value)}
+                      placeholder="https://example.com"
+                      className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white font-mono"
+                    />
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => submitAddForm(item.key)}
+                    disabled={addBusy}
+                    className="flex items-center gap-1.5 bg-primary text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
+                  >
+                    {addBusy ? (
+                      <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full" />
+                    ) : (
+                      <Check size={14} />
+                    )}
+                    Add & Deploy
+                  </button>
+                  <button
+                    onClick={cancelAddForm}
+                    disabled={addBusy}
+                    className="flex items-center gap-1.5 text-slate-500 text-sm font-medium px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-50"
+                  >
+                    <X size={14} /> Cancel
+                  </button>
+                </div>
+              </div>
             )}
           </motion.div>
         ))}
@@ -336,6 +543,13 @@ export default function ContentEditor({
         accept="image/*"
         className="hidden"
         onChange={handleImageFile}
+      />
+      <input
+        ref={addImageInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleAddImageFile}
       />
 
       {siteId && pageFilename && previewBaseUrl && (

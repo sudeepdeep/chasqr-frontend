@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -12,6 +13,13 @@ import {
   Lock,
   ArrowRight,
   Sparkles,
+  Headset,
+  ShieldCheck,
+  MessageSquareText,
+  Code2,
+  RefreshCw,
+  CreditCard,
+  ShieldAlert,
 } from "lucide-react";
 import { AuthStore } from "../store/auth";
 import StorageNoticeBanner from "../components/StorageNoticeBanner";
@@ -77,6 +85,16 @@ const steps = [
   },
 ];
 
+const trustBar = [
+  {
+    icon: <ShieldCheck size={16} />,
+    label: "Secure payments via Razorpay & Cashfree",
+  },
+  { icon: <Lock size={16} />, label: "Free SSL on every domain" },
+  { icon: <Headset size={16} />, label: "Real expert support, not just docs" },
+  { icon: <ShieldAlert size={16} />, label: "2FA account protection" },
+];
+
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
   show: (i: number) => ({
@@ -85,6 +103,53 @@ const fadeUp = {
     transition: { delay: i * 0.08, duration: 0.5 },
   }),
 };
+
+/** Renders the real asset at srcHint (image/GIF) once it exists in /public/images/.
+ *  Falls back to a decorative placeholder — no visitor-facing text — if the file
+ *  is missing (e.g. onError, or before postbuild the file simply 404s). */
+function MediaSlot({
+  icon,
+  srcHint,
+  alt,
+  gradient,
+}: {
+  icon: React.ReactNode;
+  srcHint: string;
+  alt: string;
+  gradient: string;
+}) {
+  const [failed, setFailed] = useState(false);
+
+  return (
+    <div
+      className={`relative aspect-[4/3] rounded-3xl border border-slate-200 bg-gradient-to-br ${gradient} flex items-center justify-center overflow-hidden`}
+    >
+      {!failed && (
+        <img
+          src={srcHint}
+          alt={alt}
+          onError={() => setFailed(true)}
+          className="relative w-full h-full object-contain p-8"
+        />
+      )}
+      {failed && (
+        <>
+          <div
+            className="absolute inset-0 opacity-40"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle, rgba(37,99,235,0.15) 1.5px, transparent 1.5px)",
+              backgroundSize: "20px 20px",
+            }}
+          />
+          <div className="relative w-20 h-20 bg-white rounded-3xl shadow-md flex items-center justify-center">
+            {icon}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function Landing() {
   const { user } = AuthStore.useState();
@@ -104,7 +169,7 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-white overflow-x-clip">
       {/* Hero */}
-      <section className="relative pt-36 pb-24 px-6 text-center max-w-5xl mx-auto">
+      <section className="relative pt-36 pb-20 px-6 text-center max-w-5xl mx-auto">
         {/* Ambient gradient blobs */}
         <div className="absolute -top-24 -left-32 w-[28rem] h-[28rem] bg-primary/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute top-40 -right-32 w-[24rem] h-[24rem] bg-sky-300/30 rounded-full blur-3xl pointer-events-none" />
@@ -116,10 +181,13 @@ export default function Landing() {
           transition={{ duration: 0.6 }}
           className="relative"
         >
-          <span className="inline-flex items-center gap-1.5 bg-white/60 backdrop-blur-md text-primary text-xs font-semibold px-4 py-1.5 rounded-full mb-8 tracking-wide uppercase border border-primary/20 shadow-sm">
+          <Link
+            to="/seo-checker"
+            className="inline-flex items-center gap-1.5 bg-white/60 backdrop-blur-md text-primary text-xs font-semibold px-4 py-1.5 rounded-full mb-8 tracking-wide uppercase border border-primary/20 shadow-sm hover:bg-white transition-colors"
+          >
             <Sparkles size={12} />
-            Custom domains with free SSL are here
-          </span>
+            New — Try the free SEO checker
+          </Link>
 
           <h1 className="font-bebas text-7xl md:text-9xl text-slate-900 leading-none mb-6">
             Deploy Your
@@ -194,6 +262,21 @@ export default function Landing() {
         </motion.div>
       </section>
 
+      {/* Trust bar */}
+      <section className="border-y border-slate-100 bg-slate-50/60 py-5 px-6">
+        <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-center gap-x-10 gap-y-3">
+          {trustBar.map((t) => (
+            <span
+              key={t.label}
+              className="flex items-center gap-2 text-xs font-medium text-slate-500"
+            >
+              <span className="text-primary">{t.icon}</span>
+              {t.label}
+            </span>
+          ))}
+        </div>
+      </section>
+
       {/* How it works */}
       <section className="py-24 px-6">
         <div className="max-w-5xl mx-auto">
@@ -232,6 +315,206 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Spotlight: Free SEO Checker */}
+      <section className="py-24 px-6">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+          >
+            <span className="inline-flex items-center gap-1.5 bg-primary-light text-primary text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wide mb-4">
+              New · Free tool
+            </span>
+            <h2 className="font-bebas text-5xl text-slate-900 mb-4 leading-tight">
+              Know exactly what's holding your SEO back
+            </h2>
+            <p className="text-slate-500 leading-relaxed mb-6">
+              Paste any URL — yours or anyone's — and get an instant,
+              plain-English audit. No signup, no jargon, just what to fix and
+              why it matters.
+            </p>
+            <ul className="space-y-3 mb-8">
+              {[
+                "20+ checks across meta tags, structure, content, and links",
+                "Free forever, no login required",
+                "Deployed on Chasqr? Get a deeper check plus a built-in SEO Manager",
+              ].map((item) => (
+                <li
+                  key={item}
+                  className="flex items-start gap-2.5 text-sm text-slate-600"
+                >
+                  <ShieldCheck
+                    size={16}
+                    className="text-primary mt-0.5 shrink-0"
+                  />
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <Link
+              to="/seo-checker"
+              className="group inline-flex items-center gap-2 bg-primary text-white font-semibold px-6 py-3 rounded-xl hover:bg-primary-dark transition-all text-sm shadow-lg shadow-primary/20"
+            >
+              Try the Free SEO Checker
+              <ArrowRight
+                size={15}
+                className="transition-transform group-hover:translate-x-1"
+              />
+            </Link>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+          >
+            <MediaSlot
+              icon={<Search size={28} className="text-primary" />}
+              srcHint="/images/searching.svg"
+              alt="Chasqr SEO Checker running a live audit"
+              gradient="from-slate-50 to-primary-light/40"
+            />
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Spotlight: Expert Support */}
+      <section className="py-24 px-6 bg-slate-50">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            className="lg:order-2"
+          >
+            <span className="inline-flex items-center gap-1.5 bg-primary-light text-primary text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wide mb-4">
+              Stuck? We've got you
+            </span>
+            <h2 className="font-bebas text-5xl text-slate-900 mb-4 leading-tight">
+              Real humans, not just a help center
+            </h2>
+            <p className="text-slate-500 leading-relaxed mb-6">
+              Chat live with a verified expert right from your dashboard. Share
+              screenshots, paste your code, and they can even redeploy fixes on
+              your behalf.
+            </p>
+            <ul className="space-y-3 mb-8">
+              {[
+                {
+                  icon: <MessageSquareText size={16} />,
+                  text: "Live chat, with screenshot & photo sharing",
+                },
+                {
+                  icon: <Code2 size={16} />,
+                  text: "Share your source code securely",
+                },
+                {
+                  icon: <RefreshCw size={16} />,
+                  text: "Experts can redeploy fixes directly to your site",
+                },
+              ].map((item) => (
+                <li
+                  key={item.text}
+                  className="flex items-start gap-2.5 text-sm text-slate-600"
+                >
+                  <span className="text-primary mt-0.5 shrink-0">
+                    {item.icon}
+                  </span>
+                  {item.text}
+                </li>
+              ))}
+            </ul>
+            <Link
+              to={user ? "/dashboard" : "/register"}
+              className="group inline-flex items-center gap-2 bg-primary text-white font-semibold px-6 py-3 rounded-xl hover:bg-primary-dark transition-all text-sm shadow-lg shadow-primary/20"
+            >
+              Get Expert Help
+              <ArrowRight
+                size={15}
+                className="transition-transform group-hover:translate-x-1"
+              />
+            </Link>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            className="lg:order-1"
+          >
+            <MediaSlot
+              icon={<Headset size={28} className="text-primary" />}
+              srcHint="/images/expert-support-illustration.svg"
+              alt="Illustration of live expert support chat"
+              gradient="from-sky-50 to-primary-light/40"
+            />
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Spotlight: Secure Payments */}
+      <section className="py-24 px-6">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+          >
+            <span className="inline-flex items-center gap-1.5 bg-primary-light text-primary text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wide mb-4">
+              Bank-grade security
+            </span>
+            <h2 className="font-bebas text-5xl text-slate-900 mb-4 leading-tight">
+              Payments that just work — every time
+            </h2>
+            <p className="text-slate-500 leading-relaxed mb-6">
+              We process payments through both Razorpay and Cashfree. If one has
+              a hiccup, we automatically fall back to the other — so your
+              upgrade never gets stuck waiting on a single provider.
+            </p>
+            <ul className="space-y-3 mb-8">
+              {[
+                {
+                  icon: <CreditCard size={16} />,
+                  text: "PCI-compliant payment processors",
+                },
+                {
+                  icon: <RefreshCw size={16} />,
+                  text: "Automatic failover between two independent gateways",
+                },
+                {
+                  icon: <ShieldCheck size={16} />,
+                  text: "One-time payments — no hidden subscriptions",
+                },
+              ].map((item) => (
+                <li
+                  key={item.text}
+                  className="flex items-start gap-2.5 text-sm text-slate-600"
+                >
+                  <span className="text-primary mt-0.5 shrink-0">
+                    {item.icon}
+                  </span>
+                  {item.text}
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+          >
+            <MediaSlot
+              icon={<ShieldCheck size={28} className="text-primary" />}
+              srcHint="/images/secure-payments-illustration.svg"
+              alt="Illustration of secure payment processing"
+              gradient="from-emerald-50 to-primary-light/40"
+            />
+          </motion.div>
+        </div>
+      </section>
+
       {/* Features */}
       <section className="relative py-24 px-6 bg-slate-50 overflow-hidden">
         {/* Ambient blobs */}
@@ -245,7 +528,7 @@ export default function Landing() {
             viewport={{ once: true }}
             className="font-bebas text-5xl text-center text-slate-900 mb-4"
           >
-            Everything You Need
+            Everything Else You Need
           </motion.h2>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
@@ -320,9 +603,21 @@ export default function Landing() {
         </span>
         © {new Date().getFullYear()} — Deploy fast, iterate faster.
         <div className="mt-2 flex items-center justify-center gap-4 text-xs">
-          <Link to="/docs" className="hover:text-primary transition-colors">Docs</Link>
-          <Link to="/terms" className="hover:text-primary transition-colors">Terms</Link>
-          <Link to="/privacy" className="hover:text-primary transition-colors">Privacy</Link>
+          <Link to="/docs" className="hover:text-primary transition-colors">
+            Docs
+          </Link>
+          <Link
+            to="/seo-checker"
+            className="hover:text-primary transition-colors"
+          >
+            SEO Checker
+          </Link>
+          <Link to="/terms" className="hover:text-primary transition-colors">
+            Terms
+          </Link>
+          <Link to="/privacy" className="hover:text-primary transition-colors">
+            Privacy
+          </Link>
         </div>
       </footer>
 

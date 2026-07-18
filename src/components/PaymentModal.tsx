@@ -1,17 +1,34 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-toastify";
 import { Lock, X, CreditCard } from "lucide-react";
 import { createPaymentOrderAPI, verifyOrderAPI } from "../api/payment.api";
+import { getUpgradeQuoteAPI } from "../api/site.api";
 import { loadRazorpayScript } from "../lib/razorpay";
 import { loadCashfreeScript } from "../lib/cashfree";
+
+interface UpgradeQuote {
+  amountRupees: number;
+  sizeMB: number;
+  pages: number;
+  breakdown: {
+    basePaise: number;
+    sizePaise: number;
+    pagePaise: number;
+    floored: boolean;
+    capped: boolean;
+  };
+}
 
 interface Props {
   open: boolean;
   onClose: () => void;
   /** Upload size in bytes — omit for a generic upgrade (no upload context). */
   totalSize?: number;
+  /** When set, this is a dynamic PRO-upgrade for that site — price is fetched
+   *  and computed from the site's size + pages, not the flat credit price. */
+  siteId?: string;
   onPaidConfirm: () => void;
   title?: string;
 }
@@ -20,11 +37,31 @@ export default function PaymentModal({
   open,
   onClose,
   totalSize,
+  siteId,
   onPaidConfirm,
   title = "Large Upload",
 }: Props) {
   const [paying, setPaying] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<"razorpay" | "cashfree">("razorpay");
+  const [quote, setQuote] = useState<UpgradeQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+
+  // Fetch the site-specific price when this modal opens for an upgrade.
+  useEffect(() => {
+    if (!open || !siteId) { setQuote(null); return; }
+    let cancelled = false;
+    setQuoteLoading(true);
+    getUpgradeQuoteAPI(siteId)
+      .then((res) => { if (!cancelled) setQuote(res.data.data.quote); })
+      .catch((err) => {
+        if (!cancelled) toast.error(err.response?.data?.message || "Could not load upgrade price");
+      })
+      .finally(() => { if (!cancelled) setQuoteLoading(false); });
+    return () => { cancelled = true; };
+  }, [open, siteId]);
+
+  const rupees = (paise: number) => `₹${(paise / 100).toFixed(0)}`;
+  const payLabel = quote ? `Pay ₹${quote.amountRupees.toFixed(0)} & Unlock` : "Pay & Unlock";
 
   const handleVerified = () => {
     toast.success("Payment verified — unlocked!");
@@ -34,7 +71,7 @@ export default function PaymentModal({
   const handlePay = async () => {
     setPaying(true);
     try {
-      const res = await createPaymentOrderAPI(selectedProvider);
+      const res = await createPaymentOrderAPI(selectedProvider, siteId);
       const { orderId, amount, currency, checkout, name, email, fellBack } = res.data.data;
 
       if (fellBack) {
@@ -133,14 +170,48 @@ export default function PaymentModal({
               ) : (
                 <>
                   Upgrading this site to{" "}
-                  <strong className="text-amber-600">PRO</strong> requires a
-                  one-time payment. Once paid, it unlocks a{" "}
+                  <strong className="text-amber-600">PRO</strong> unlocks a{" "}
                   <strong>custom domain</strong>,{" "}
                   <strong>expert support chat</strong>, and{" "}
-                  <strong>uploads of any size</strong> — forever, for this site.
+                  <strong>uploads of any size</strong> — one payment, forever,
+                  for this site.
                 </>
               )}
             </p>
+
+            {/* Dynamic price breakdown for a site upgrade */}
+            {siteId && (
+              <div className="border border-slate-200 rounded-xl p-4 mb-5 text-sm">
+                {quoteLoading || !quote ? (
+                  <div className="flex items-center gap-2 text-slate-400 py-1">
+                    <span className="animate-spin w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full inline-block" />
+                    Calculating your price…
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex justify-between text-slate-500 mb-1">
+                      <span>Base</span>
+                      <span>{rupees(quote.breakdown.basePaise)}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-500 mb-1">
+                      <span>Size · {quote.sizeMB} MB</span>
+                      <span>{rupees(quote.breakdown.sizePaise)}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-500 mb-2">
+                      <span>Pages · {quote.pages}</span>
+                      <span>{rupees(quote.breakdown.pagePaise)}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold text-slate-900 border-t border-slate-100 pt-2">
+                      <span>Total{quote.breakdown.capped ? " (capped)" : quote.breakdown.floored ? " (min)" : ""}</span>
+                      <span>₹{quote.amountRupees.toFixed(0)}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-2">
+                      Priced from this site's total size and {quote.pages} page{quote.pages === 1 ? "" : "s"}.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
 
             <div className="flex gap-3 mb-5">
               {(["razorpay", "cashfree"] as const).map((p) => (
@@ -167,7 +238,7 @@ export default function PaymentModal({
 
             <button
               onClick={handlePay}
-              disabled={paying}
+              disabled={paying || (!!siteId && (quoteLoading || !quote))}
               className="w-full flex items-center justify-center gap-2 bg-primary text-white font-semibold py-3.5 rounded-xl hover:bg-primary-dark transition-colors text-sm disabled:opacity-50"
             >
               {paying ? (
@@ -175,7 +246,11 @@ export default function PaymentModal({
               ) : (
                 <CreditCard size={16} />
               )}
-              {paying ? "Opening checkout..." : "Pay ₹199 & Unlock"}
+              {paying
+                ? "Opening checkout..."
+                : siteId
+                  ? payLabel
+                  : "Pay ₹199 & Unlock"}
             </button>
 
             <p className="text-xs text-slate-400 text-center mt-4">

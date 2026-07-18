@@ -26,6 +26,9 @@ export const updateColorsAPI = (siteId: string, page: string, replacements: Reco
 export const upgradeSiteAPI = (siteId: string) =>
   api.put(`/api/sites/${siteId}/upgrade`);
 
+export const getUpgradeQuoteAPI = (siteId: string) =>
+  api.get(`/api/sites/${siteId}/upgrade-quote`);
+
 export const uploadSourceArchiveAPI = (siteId: string, formData: FormData) =>
   api.post(`/api/sites/${siteId}/source`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -39,6 +42,15 @@ export const updateElementsAPI = (
   page: string,
   actions: { key: string; action: 'hide' | 'show' | 'duplicate' | 'delete' }[]
 ) => api.put(`/api/sites/${siteId}/elements`, { page, actions });
+
+export const addElementAPI = (
+  siteId: string,
+  page: string,
+  afterKey: string,
+  type: 'text' | 'image' | 'link',
+  value: string,
+  href?: string,
+) => api.post(`/api/sites/${siteId}/elements/add`, { page, afterKey, type, value, href });
 
 export const updateContentAPI = (
   siteId: string,

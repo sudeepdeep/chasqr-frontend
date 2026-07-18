@@ -13,12 +13,23 @@ export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [otpContext, setOtpContext] = useState<'none' | 'verify-email' | 'mfa'>('none');
+  // The email the OTP flow verifies against. For password login it's the form
+  // email; for Google MFA it comes back in the MFA_REQUIRED response (there's
+  // no email field on screen), so we track it separately.
+  const [mfaEmail, setMfaEmail] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
       const res = await loginAPI(form);
+      // MFA_REQUIRED comes back as HTTP 200 with success:false (a challenge, not
+      // an error), so axios doesn't throw — detect it here before setAuth.
+      if (res.data?.code === 'MFA_REQUIRED') {
+        setMfaEmail(res.data.data?.email || form.email);
+        setOtpContext('mfa');
+        return;
+      }
       setAuth(res.data.data.user, res.data.data.token);
       navigate('/dashboard');
     } catch (err: any) {
@@ -26,6 +37,8 @@ export default function Login() {
       if (code === 'EMAIL_NOT_VERIFIED') {
         setOtpContext('verify-email');
       } else if (code === 'MFA_REQUIRED') {
+        // Fallback in case the backend ever returns this as an error status.
+        setMfaEmail(err.response?.data?.data?.email || form.email);
         setOtpContext('mfa');
       } else {
         toast.error(err.response?.data?.message || 'Login failed');
@@ -43,6 +56,13 @@ export default function Login() {
   const handleGoogle = async (credential: string) => {
     try {
       const res = await googleAuthAPI(credential);
+      // MFA_REQUIRED comes back as HTTP 200 with success:false, so axios doesn't
+      // throw — detect it here and hand off to the same email-OTP flow.
+      if (res.data?.code === 'MFA_REQUIRED') {
+        setMfaEmail(res.data.data.email);
+        setOtpContext('mfa');
+        return;
+      }
       setAuth(res.data.data.user, res.data.data.token);
       navigate('/dashboard');
     } catch (err: any) {
@@ -60,7 +80,7 @@ export default function Login() {
     >
       {otpContext !== 'none' ? (
         <EmailOtpVerify
-          email={form.email}
+          email={otpContext === 'mfa' ? mfaEmail : form.email}
           onVerified={handleVerified}
           onBack={() => setOtpContext('none')}
           {...(otpContext === 'mfa'

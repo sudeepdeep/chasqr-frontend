@@ -2,15 +2,14 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
-import { Rocket, Package, FileText, Lock } from 'lucide-react';
+import { Rocket, Package, FileText, Lock, Zap } from 'lucide-react';
 import { uploadZipAPI, uploadFilesAPI } from '../api/site.api';
 import { getPaymentInfoAPI } from '../api/payment.api';
 import FileUploader from '../components/FileUploader';
 import PaymentModal from '../components/PaymentModal';
+import { APP_DOMAIN } from '../lib/siteUrl';
 
 const FREE_UPLOAD_LIMIT = 5 * 1024 * 1024; // 5 MB
-
-const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 export default function Upload() {
   const navigate = useNavigate();
@@ -21,6 +20,9 @@ export default function Upload() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  // For built React/Vue/Angular apps: keep them live (JS runs, not editable)
+  // instead of the default — prerendering to an editable static snapshot.
+  const [keepInteractive, setKeepInteractive] = useState(false);
 
   const handleZipSelect = (file: File) => {
     setSelectedZip(file);
@@ -90,6 +92,7 @@ export default function Upload() {
         fd.append('file', selectedZip);
         fd.append('name', siteName.trim());
         if (slug) fd.append('slug', slug);
+        fd.append('keepInteractive', String(keepInteractive));
         res = await uploadZipAPI(fd);
       } else {
         const fd = new FormData();
@@ -97,6 +100,7 @@ export default function Upload() {
         fd.append('paths', JSON.stringify(selectedPaths));
         fd.append('name', siteName.trim());
         if (slug) fd.append('slug', slug);
+        fd.append('keepInteractive', String(keepInteractive));
         res = await uploadFilesAPI(fd);
       }
       const { site } = res.data.data;
@@ -144,7 +148,7 @@ export default function Upload() {
             </label>
             <div className="flex items-center border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent">
               <span className="bg-slate-50 text-slate-400 text-sm px-4 py-3 border-r border-slate-200 whitespace-nowrap shrink-0">
-                /sites/
+                https://
               </span>
               <input
                 type="text"
@@ -152,24 +156,47 @@ export default function Upload() {
                 onChange={(e) => handleSlugChange(e.target.value)}
                 placeholder="my-project"
                 maxLength={50}
-                className="flex-1 px-3 py-3 text-sm focus:outline-none bg-white"
+                className="flex-1 px-3 py-3 text-sm focus:outline-none bg-white min-w-0"
               />
+              <span className="bg-slate-50 text-slate-400 text-sm px-4 py-3 border-l border-slate-200 whitespace-nowrap shrink-0">
+                .{APP_DOMAIN}
+              </span>
             </div>
             {slugError ? (
               <p className="text-xs text-red-500 mt-1.5">{slugError}</p>
             ) : (
               <p className="text-xs text-slate-400 mt-1.5">
                 Your site will be at{' '}
-                <span className="font-mono text-primary">{BASE_URL}/sites/{previewSlug}/</span>
+                <span className="font-mono text-primary">https://{previewSlug}.{APP_DOMAIN}</span>
                 {' '}— lowercase letters, numbers, and hyphens only
               </p>
             )}
           </div>
 
           {/* File uploader */}
-          <div className="mb-8">
+          <div className="mb-6">
             <FileUploader onZipSelect={handleZipSelect} onFilesSelect={handleFilesSelect} />
           </div>
+
+          {/* Interactive-app option (for built React/Vue/Angular apps) */}
+          <label className="mb-8 flex items-start gap-3 border border-slate-200 rounded-xl p-4 cursor-pointer hover:border-primary/40 transition-colors">
+            <input
+              type="checkbox"
+              checked={keepInteractive}
+              onChange={(e) => setKeepInteractive(e.target.checked)}
+              className="mt-0.5 w-4 h-4 accent-primary shrink-0"
+            />
+            <span className="text-sm">
+              <span className="font-medium text-slate-800 flex items-center gap-1.5">
+                <Zap size={14} className="text-primary" /> This is an interactive app — keep it live
+              </span>
+              <span className="text-slate-500 text-xs leading-relaxed block mt-1">
+                For React/Vue/Angular apps that need working buttons, state, or routing.
+                Leave unchecked for regular sites so you can edit text &amp; images in the panel —
+                checking this keeps the app fully interactive but turns off in-panel content editing.
+              </span>
+            </span>
+          </label>
 
           {hasSelection && (
             <motion.div

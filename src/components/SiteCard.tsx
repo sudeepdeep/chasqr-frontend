@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Eye, Layers, Pencil, ExternalLink, Pause, Play, Trash2, Calendar, Check, X, Crown } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { renameSiteAPI } from '../api/site.api';
+import { publicSiteUrl } from '../lib/siteUrl';
 
 interface Site {
   siteId: string;
@@ -26,7 +27,7 @@ interface Props {
 
 export default function SiteCard({ site, onDelete, onToggle, onRename }: Props) {
   const navigate = useNavigate();
-  const previewUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/sites/${site.slug || site.siteId}/`;
+  const previewUrl = publicSiteUrl(site.slug || site.siteId);
   const totalElements = site.pages?.reduce((acc, p) => acc + p.contentMap.length, 0) ?? 0;
   const isActive = site.status === 'active';
 

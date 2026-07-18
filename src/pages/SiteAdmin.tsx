@@ -33,7 +33,7 @@ import {
   setCustomDomainAPI,
   removeCustomDomainAPI,
   updateElementsAPI,
-  upgradeSiteAPI,
+  addElementAPI,
 } from "../api/site.api";
 import ContentEditor from "../components/ContentEditor";
 import AnalyticsChart from "../components/AnalyticsChart";
@@ -49,6 +49,7 @@ import { getPaymentInfoAPI } from "../api/payment.api";
 import { getMyRequestsAPI } from "../api/support.api";
 import { getSocket } from "../lib/socket";
 import { AuthStore } from "../store/auth";
+import { publicSiteUrl, APP_DOMAIN } from "../lib/siteUrl";
 
 const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
@@ -126,6 +127,7 @@ export default function SiteAdmin() {
     setActiveSectionState(section);
     activeSectionRef.current = section;
     if (section === "support") setUnreadSupportCount(0);
+    window.scrollTo({ top: 0, behavior: "smooth" });
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.set("tab", section);
@@ -325,37 +327,26 @@ export default function SiteAdmin() {
     }
   };
 
-  const handleUpgradeClick = async () => {
+  // Upgrading a project is a dynamic, per-site payment (priced from its size +
+  // pages), so the button opens the payment modal directly — the modal fetches
+  // the quote and, once paid, the backend has already marked the site PRO.
+  const handleUpgradeClick = () => {
+    if (!siteId) return;
+    setUpgradeModalOpen(true);
+  };
+
+  // Called from the payment modal once checkout is verified — the site is
+  // already marked PRO server-side, so just refetch to reflect the new plan.
+  const handlePaidAndUpgrade = async () => {
     if (!siteId) return;
     setUpgrading(true);
     try {
-      await performUpgrade();
-    } finally {
-      setUpgrading(false);
-    }
-  };
-
-  const performUpgrade = async () => {
-    if (!siteId) return;
-    try {
-      const res = await upgradeSiteAPI(siteId);
+      const res = await getSiteAPI(siteId);
       setSite(res.data.data.site);
       setUpgradeModalOpen(false);
       toast.success("Site upgraded to PRO!");
     } catch (err: any) {
-      if (err.response?.status === 402) {
-        setUpgradeModalOpen(true);
-      } else {
-        toast.error(err.response?.data?.message || "Upgrade failed");
-      }
-    }
-  };
-
-  // Called from the payment modal once Razorpay checkout is verified
-  const handlePaidAndUpgrade = async () => {
-    setUpgrading(true);
-    try {
-      await performUpgrade();
+      toast.error(err.response?.data?.message || "Upgrade succeeded but refresh failed — reload the page");
     } finally {
       setUpgrading(false);
     }
@@ -412,6 +403,24 @@ export default function SiteAdmin() {
       toast.success(`Element ${verbs[actions[0].action]} and deployed`);
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Action failed");
+    }
+  };
+
+  const handleAddElement = async (
+    afterKey: string,
+    type: "text" | "image" | "link",
+    value: string,
+    href?: string,
+  ) => {
+    if (!siteId || !site) return;
+    const page = site.pages[activePage];
+    if (!page) return;
+    try {
+      const res = await addElementAPI(siteId, page.filename, afterKey, type, value, href);
+      setSite(res.data.data.site);
+      toast.success("Element added and deployed");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Could not add element");
     }
   };
 
@@ -505,10 +514,11 @@ export default function SiteAdmin() {
         onPaidConfirm={handlePaidAndRedeploy}
       />
 
-      {/* Direct "Upgrade to PRO" payment modal */}
+      {/* Direct "Upgrade to PRO" payment modal — dynamic per-site pricing */}
       <PaymentModal
         open={upgradeModalOpen}
         onClose={() => setUpgradeModalOpen(false)}
+        siteId={siteId}
         onPaidConfirm={handlePaidAndUpgrade}
         title="Upgrade to PRO"
       />
@@ -600,7 +610,7 @@ export default function SiteAdmin() {
                 </button>
               )}
               <a
-                href={previewUrl}
+                href={site ? publicSiteUrl(site.slug) : "#"}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 border border-slate-200 text-slate-600 text-sm font-medium px-4 py-2.5 rounded-xl hover:bg-slate-50 transition-colors"
@@ -689,7 +699,7 @@ export default function SiteAdmin() {
                     <div className="space-y-2">
                       <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden bg-white focus-within:ring-2 focus-within:ring-primary">
                         <span className="bg-slate-50 text-slate-400 text-sm px-3 py-2 border-r border-slate-200 whitespace-nowrap shrink-0">
-                          {BASE_URL}/sites/
+                          https://
                         </span>
                         <input
                           autoFocus
@@ -703,9 +713,12 @@ export default function SiteAdmin() {
                               setSlugError("");
                             }
                           }}
-                          className="flex-1 px-3 py-2 text-sm focus:outline-none bg-white font-mono"
+                          className="flex-1 px-3 py-2 text-sm focus:outline-none bg-white font-mono min-w-0"
                           maxLength={50}
                         />
+                        <span className="bg-slate-50 text-slate-400 text-sm px-3 py-2 border-l border-slate-200 whitespace-nowrap shrink-0">
+                          .{APP_DOMAIN}
+                        </span>
                         <button
                           onClick={handleSlugSave}
                           disabled={!!slugError || slugSaving}
@@ -730,15 +743,31 @@ export default function SiteAdmin() {
                     </div>
                   ) : (
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm font-mono text-primary truncate">
-                        {BASE_URL}/sites/{site.slug}/
-                      </span>
-                      <button
-                        onClick={() => setEditingSlug(true)}
-                        className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-primary border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-white transition-colors shrink-0"
+                      <a
+                        href={publicSiteUrl(site.slug)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-mono text-primary truncate hover:underline"
                       >
-                        <Pencil size={11} /> Edit URL
-                      </button>
+                        {publicSiteUrl(site.slug)}
+                      </a>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(publicSiteUrl(site.slug));
+                            toast.success("Link copied");
+                          }}
+                          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-primary border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-white transition-colors"
+                        >
+                          <Link2 size={11} /> Copy
+                        </button>
+                        <button
+                          onClick={() => setEditingSlug(true)}
+                          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-primary border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-white transition-colors"
+                        >
+                          <Pencil size={11} /> Edit URL
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1041,6 +1070,7 @@ export default function SiteAdmin() {
                       previewOpen={previewOpen}
                       onPreviewOpenChange={setPreviewOpen}
                       onElementsAction={handleElementsAction}
+                      onAddElement={handleAddElement}
                     />
                   )}
                 </div>
@@ -1081,6 +1111,7 @@ export default function SiteAdmin() {
                   />
                   <SEOEditor
                     siteId={site.siteId}
+                    siteSlug={site.slug}
                     pages={site.pages}
                     onSaveSuccess={(updatedPages) => {
                       setSite((prev: any) => ({ ...prev, pages: updatedPages }));

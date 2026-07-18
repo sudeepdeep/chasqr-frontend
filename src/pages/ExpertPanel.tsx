@@ -16,8 +16,7 @@ import { redeployZipAPI } from "../api/site.api";
 import SupportChat from "../components/SupportChat";
 import { getSocket } from "../lib/socket";
 import { SupportUnreadStore, clearUnread, setOpenSupportRequest } from "../store/supportUnread";
-
-const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+import { publicSiteUrl } from "../lib/siteUrl";
 
 interface Req {
   _id: string;
@@ -285,7 +284,7 @@ export default function ExpertPanel() {
                   <div className="flex items-center gap-2 flex-wrap">
                     {activeDetail.site && (
                       <a
-                        href={`${BASE_URL}/sites/${activeDetail.site.slug}/`}
+                        href={publicSiteUrl(activeDetail.site.slug)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-primary border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors"
