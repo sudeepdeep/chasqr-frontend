@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import PreviewModal from "./PreviewModal";
+import StyleToolbar from "./StyleToolbar";
 import { uploadAssetAPI } from "../api/site.api";
 
 interface ContentItem {
@@ -25,6 +26,9 @@ interface ContentItem {
   type: "text" | "image" | "link";
   hidden?: boolean;
   href?: string;
+  style?: string;
+  alt?: string;
+  target?: string;
 }
 
 export type ElementAction = {
@@ -407,6 +411,57 @@ export default function ContentEditor({
                 onChange={(e) => handleChange(item.key, e.target.value)}
                 className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
               />
+            )}
+
+            {/* Styling controls for text & link elements */}
+            {(item.type === "text" || item.type === "link") && (
+              <StyleToolbar
+                style={
+                  edits[`${item.key}::style`] !== undefined
+                    ? edits[`${item.key}::style`]
+                    : item.style
+                }
+                onChange={(s) => handleChange(`${item.key}::style`, s)}
+              />
+            )}
+
+            {/* Open-in-new-tab toggle for links */}
+            {item.type === "link" && (
+              <label className="flex items-center gap-2 mt-2 text-xs text-slate-600 cursor-pointer w-fit">
+                <input
+                  type="checkbox"
+                  checked={
+                    (edits[`${item.key}::target`] !== undefined
+                      ? edits[`${item.key}::target`]
+                      : item.target) === "_blank"
+                  }
+                  onChange={(e) =>
+                    handleChange(`${item.key}::target`, e.target.checked ? "_blank" : "")
+                  }
+                  className="accent-primary w-3.5 h-3.5"
+                />
+                Open in a new tab
+              </label>
+            )}
+
+            {/* Alt text for images (SEO & accessibility) */}
+            {item.type === "image" && (
+              <div className="mt-2">
+                <span className="text-xs text-slate-400 mb-1 block">
+                  Alt text <span className="text-slate-300">— describes the image for SEO &amp; screen readers</span>
+                </span>
+                <input
+                  type="text"
+                  value={
+                    edits[`${item.key}::alt`] !== undefined
+                      ? edits[`${item.key}::alt`]
+                      : item.alt ?? ""
+                  }
+                  onChange={(e) => handleChange(`${item.key}::alt`, e.target.value)}
+                  placeholder="e.g. Team photo at the 2026 launch event"
+                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
+                />
+              </div>
             )}
 
             {/* Inline "add a new element below this one" form */}

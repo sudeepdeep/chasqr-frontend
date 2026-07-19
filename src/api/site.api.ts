@@ -52,6 +52,19 @@ export const addElementAPI = (
   href?: string,
 ) => api.post(`/api/sites/${siteId}/elements/add`, { page, afterKey, type, value, href });
 
+export const updateLayoutAPI = (
+  siteId: string,
+  page: string,
+  layout: any[],
+  layoutStyle?: { bg?: string },
+) => api.put(`/api/sites/${siteId}/layout`, { page, layout, layoutStyle });
+
+export const getSubmissionsAPI = (siteId: string) =>
+  api.get(`/api/sites/${siteId}/submissions`);
+
+export const deleteSubmissionAPI = (siteId: string, id: string) =>
+  api.delete(`/api/sites/${siteId}/submissions/${id}`);
+
 export const updateContentAPI = (
   siteId: string,
   page: string,

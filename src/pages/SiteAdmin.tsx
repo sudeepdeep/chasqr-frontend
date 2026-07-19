@@ -23,6 +23,8 @@ import {
   Headset,
   Lock,
   Search,
+  LayoutTemplate,
+  Inbox,
 } from "lucide-react";
 import {
   getSiteAPI,
@@ -36,6 +38,8 @@ import {
   addElementAPI,
 } from "../api/site.api";
 import ContentEditor from "../components/ContentEditor";
+import LayoutBuilder from "../components/LayoutBuilder";
+import Submissions from "../components/Submissions";
 import AnalyticsChart from "../components/AnalyticsChart";
 import SEOEditor from "../components/SEOEditor";
 import SiteSeoChecker from "../components/SiteSeoChecker";
@@ -63,6 +67,7 @@ interface Page {
   filename: string;
   title: string;
   contentMap: ContentItem[];
+  layout?: any[];
 }
 
 type Section =
@@ -70,10 +75,12 @@ type Section =
   | "domain"
   | "files"
   | "editor"
+  | "layout"
   | "colors"
   | "seo"
   | "seo-check"
   | "analytics"
+  | "submissions"
   | "support";
 
 const NAV_GROUPS: {
@@ -92,10 +99,12 @@ const NAV_GROUPS: {
     label: "Content",
     items: [
       { id: "editor", label: "Editor", icon: FileCode },
+      { id: "layout", label: "Layout", icon: LayoutTemplate },
       { id: "colors", label: "Colors", icon: Palette },
       { id: "seo", label: "SEO", icon: Globe },
       { id: "seo-check", label: "SEO Checker", icon: Search },
       { id: "analytics", label: "Analytics", icon: BarChart3 },
+      { id: "submissions", label: "Submissions", icon: Inbox },
     ],
   },
   {
@@ -1073,6 +1082,27 @@ export default function SiteAdmin() {
                       onAddElement={handleAddElement}
                     />
                   )}
+                </div>
+              )}
+
+              {/* Layout builder */}
+              {activeSection === "layout" && site && siteId && currentPage && (
+                <LayoutBuilder
+                  key={currentPage.filename}
+                  siteId={siteId}
+                  page={currentPage.filename}
+                  initialLayout={currentPage.layout}
+                  initialLayoutStyle={(currentPage as any).layoutStyle}
+                  onSaved={(updatedSite) => setSite(updatedSite)}
+                />
+              )}
+
+              {/* Form submissions */}
+              {activeSection === "submissions" && siteId && (
+                <div>
+                  <h2 className="font-bebas text-2xl text-slate-900 mb-1">Form Submissions</h2>
+                  <p className="text-xs text-slate-500 mb-4">Messages sent through your site's contact form.</p>
+                  <Submissions siteId={siteId} />
                 </div>
               )}
 
