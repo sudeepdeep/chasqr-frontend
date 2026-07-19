@@ -13,11 +13,12 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   Plus, Trash2, Type, Image as ImageIcon, MousePointerClick, GripVertical,
   Monitor, Smartphone, Save, Columns, Upload, Palette, Sparkles, Paintbrush, Mail,
+  Heading as HeadingIcon, Film,
 } from "lucide-react";
 import StyleToolbar from "./StyleToolbar";
 import { updateLayoutAPI, uploadAssetAPI } from "../api/site.api";
 
-type BlockType = "text" | "image" | "button" | "form";
+type BlockType = "text" | "heading" | "image" | "button" | "form" | "embed";
 interface Block { id: string; type: BlockType; text?: string; src?: string; alt?: string; href?: string; target?: string; style?: string; successMsg?: string; }
 interface Column { id: string; span: number; blocks: Block[]; }
 interface Section {
@@ -43,6 +44,29 @@ function sectionPreviewStyle(sec: Section): React.CSSProperties {
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
+// Client-side mirror of the backend's embed allowlist — used only to show a
+// live preview / friendly warning in the builder. The backend re-validates
+// independently before ever rendering an iframe on the live site.
+function toEmbedSrcPreview(raw: string): string | null {
+  let url: URL;
+  try { url = new URL(raw); } catch { return null; }
+  if (url.protocol !== "https:") return null;
+  const host = url.hostname.replace(/^www\./, "");
+  if (host === "youtube.com" || host === "youtube-nocookie.com") {
+    if (url.pathname === "/watch") { const id = url.searchParams.get("v"); return id ? `https://www.youtube.com/embed/${id}` : null; }
+    if (url.pathname.startsWith("/embed/")) return url.toString();
+    if (url.pathname.startsWith("/shorts/")) { const id = url.pathname.split("/")[2]; return id ? `https://www.youtube.com/embed/${id}` : null; }
+    return null;
+  }
+  if (host === "youtu.be") { const id = url.pathname.slice(1); return id ? `https://www.youtube.com/embed/${id}` : null; }
+  if (host === "vimeo.com") { const id = url.pathname.split("/").filter(Boolean)[0]; return id && /^\d+$/.test(id) ? `https://player.vimeo.com/video/${id}` : null; }
+  if (host === "player.vimeo.com") return url.toString();
+  if (host === "google.com" && url.pathname.startsWith("/maps/embed")) return url.toString();
+  if (host === "google.com" && url.pathname.startsWith("/maps")) { const q = url.searchParams.get("q") || url.pathname; return `https://www.google.com/maps?q=${encodeURIComponent(q)}&output=embed`; }
+  if (host === "maps.google.com") { const q = url.searchParams.get("q") || ""; return `https://www.google.com/maps?q=${encodeURIComponent(q)}&output=embed`; }
+  return null;
+}
+
 // Distribute 12 grid units as evenly as possible across n columns.
 function evenSpans(n: number): number[] {
   const base = Math.floor(12 / n);
@@ -53,9 +77,11 @@ function evenSpans(n: number): number[] {
 }
 
 function newBlock(type: BlockType): Block {
+  if (type === "heading") return { id: uid(), type, text: "Section Heading" };
   if (type === "image") return { id: uid(), type, src: "", alt: "" };
   if (type === "button") return { id: uid(), type, text: "Click me", href: "#", target: "" };
   if (type === "form") return { id: uid(), type, text: "Send message", successMsg: "Thanks — we'll be in touch!" };
+  if (type === "embed") return { id: uid(), type, src: "" };
   return { id: uid(), type, text: "Your text here" };
 }
 function newSection(cols = 1): Section {
@@ -282,7 +308,7 @@ export default function LayoutBuilder({ siteId, page, initialLayout, initialLayo
         <DragOverlay>
           {activeBlock ? (
             <div className="px-3 py-2 bg-white border border-primary rounded-lg shadow-lg text-sm text-slate-700 opacity-90">
-              {activeBlock.type === "text" ? "Text" : activeBlock.type === "image" ? "Image" : activeBlock.type === "form" ? "Form" : "Button"}
+              {{ heading: "Heading", text: "Text", image: "Image", button: "Button", form: "Form", embed: "Embed" }[activeBlock.type]}
             </div>
           ) : null}
         </DragOverlay>
@@ -412,7 +438,7 @@ function ColumnCell({
       </SortableContext>
 
       <div className="flex items-center gap-1 mt-2">
-        {([["text", Type], ["image", ImageIcon], ["button", MousePointerClick], ["form", Mail]] as const).map(([t, Icon]) => (
+        {([["heading", HeadingIcon], ["text", Type], ["image", ImageIcon], ["button", MousePointerClick], ["form", Mail], ["embed", Film]] as const).map(([t, Icon]) => (
           <button key={t} onClick={() => onAddBlock(t)} title={`Add ${t}`} className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-primary hover:bg-white border border-slate-200 px-2 py-1 rounded-md capitalize">
             <Icon size={11} /> {t}
           </button>
@@ -450,6 +476,13 @@ function SortableBlock({ block, onPatch, onRemove, siteId }: {
           <GripVertical size={14} />
         </button>
         <div className="flex-1 min-w-0">
+          {block.type === "heading" && (
+            <>
+              <input type="text" value={block.text || ""} onChange={(e) => onPatch(block.id, { text: e.target.value })}
+                placeholder="Section heading" className="w-full text-base font-semibold text-slate-800 border border-slate-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary" />
+              <StyleToolbar style={block.style} onChange={(s) => onPatch(block.id, { style: s })} />
+            </>
+          )}
           {block.type === "text" && (
             <>
               <textarea value={block.text || ""} onChange={(e) => onPatch(block.id, { text: e.target.value })} rows={2}
@@ -502,9 +535,49 @@ function SortableBlock({ block, onPatch, onRemove, siteId }: {
               <p className="text-[11px] text-slate-400 mt-1.5">Submissions are emailed to you and saved in the Submissions tab.</p>
             </div>
           )}
+          {block.type === "embed" && (
+            <EmbedEditor block={block} onPatch={onPatch} />
+          )}
         </div>
         <button onClick={() => onRemove(block.id)} title="Delete block" className="text-slate-300 hover:text-red-500 mt-1"><Trash2 size={13} /></button>
       </div>
+    </div>
+  );
+}
+
+// ── Embed block editor: paste a link, see the live preview or a clear warning ─
+function EmbedEditor({ block, onPatch }: { block: Block; onPatch: (bid: string, patch: Partial<Block>) => void }) {
+  const src = block.src || "";
+  const preview = src.trim() ? toEmbedSrcPreview(src.trim()) : null;
+  const showWarning = src.trim().length > 0 && !preview;
+
+  return (
+    <div>
+      <input
+        type="text"
+        value={src}
+        onChange={(e) => onPatch(block.id, { src: e.target.value })}
+        placeholder="Paste a YouTube, Vimeo, or Google Maps link"
+        className={`w-full text-sm border rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 ${showWarning ? "border-amber-300 focus:ring-amber-400" : "border-slate-200 focus:ring-primary"}`}
+      />
+      {preview ? (
+        <div className="mt-2 rounded-md overflow-hidden border border-slate-200" style={{ position: "relative", width: "100%", aspectRatio: "16/9", background: "#f1f5f9" }}>
+          <iframe
+            src={preview}
+            title="Embed preview"
+            loading="lazy"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }}
+          />
+        </div>
+      ) : showWarning ? (
+        <p className="text-[11px] text-amber-600 mt-1.5">
+          That link isn't supported. Paste a YouTube, Vimeo, or Google Maps link.
+        </p>
+      ) : (
+        <p className="text-[11px] text-slate-400 mt-1.5">Supports YouTube, Vimeo, and Google Maps.</p>
+      )}
     </div>
   );
 }

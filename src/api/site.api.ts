@@ -62,6 +62,9 @@ export const updateLayoutAPI = (
 export const getSubmissionsAPI = (siteId: string) =>
   api.get(`/api/sites/${siteId}/submissions`);
 
+export const connectFormAPI = (siteId: string, page: string, formKey: string, connect: boolean) =>
+  api.put(`/api/sites/${siteId}/forms/connect`, { page, formKey, connect });
+
 export const deleteSubmissionAPI = (siteId: string, id: string) =>
   api.delete(`/api/sites/${siteId}/submissions/${id}`);
 

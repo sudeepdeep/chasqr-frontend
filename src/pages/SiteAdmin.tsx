@@ -67,6 +67,7 @@ interface Page {
   filename: string;
   title: string;
   contentMap: ContentItem[];
+  forms?: { key: string; label: string; fields: string[]; likelyContact: boolean; connected: boolean }[];
   layout?: any[];
 }
 
@@ -1098,11 +1099,17 @@ export default function SiteAdmin() {
               )}
 
               {/* Form submissions */}
-              {activeSection === "submissions" && siteId && (
+              {activeSection === "submissions" && siteId && currentPage && (
                 <div>
                   <h2 className="font-bebas text-2xl text-slate-900 mb-1">Form Submissions</h2>
                   <p className="text-xs text-slate-500 mb-4">Messages sent through your site's contact form.</p>
-                  <Submissions siteId={siteId} />
+                  <Submissions
+                    siteId={siteId}
+                    siteSlug={site.slug}
+                    page={currentPage.filename}
+                    forms={currentPage.forms}
+                    onFormsChange={(updatedSite) => setSite(updatedSite)}
+                  />
                 </div>
               )}
 
