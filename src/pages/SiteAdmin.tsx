@@ -22,7 +22,6 @@ import {
   Crown,
   Headset,
   Lock,
-  Search,
   LayoutTemplate,
   Inbox,
 } from "lucide-react";
@@ -79,7 +78,6 @@ type Section =
   | "layout"
   | "colors"
   | "seo"
-  | "seo-check"
   | "analytics"
   | "submissions"
   | "support";
@@ -103,7 +101,6 @@ const NAV_GROUPS: {
       { id: "layout", label: "Layout", icon: LayoutTemplate },
       { id: "colors", label: "Colors", icon: Palette },
       { id: "seo", label: "SEO", icon: Globe },
-      { id: "seo-check", label: "SEO Checker", icon: Search },
       { id: "analytics", label: "Analytics", icon: BarChart3 },
       { id: "submissions", label: "Submissions", icon: Inbox },
     ],
@@ -127,7 +124,9 @@ export default function SiteAdmin() {
   const [saving, setSaving] = useState(false);
   const [activePage, setActivePage] = useState(0);
   const [pendingEdits, setPendingEdits] = useState<Record<string, string>>({});
-  const tabParam = searchParams.get("tab") as Section | null;
+  // "seo-check" was merged into "seo" — keep old bookmarks working.
+  const rawTab = searchParams.get("tab");
+  const tabParam = (rawTab === "seo-check" ? "seo" : rawTab) as Section | null;
   const [activeSection, setActiveSectionState] = useState<Section>(
     tabParam && VALID_SECTIONS.has(tabParam) ? tabParam : "editor",
   );
@@ -662,15 +661,14 @@ export default function SiteAdmin() {
                           {item.id === "domain" && site.customDomain && (
                             <span className="w-1.5 h-1.5 rounded-full bg-green-500 ml-auto" />
                           )}
-                          {item.id === "support" && site.plan === "paid" && unreadSupportCount > 0 && (
+                          {item.id === "support" && unreadSupportCount > 0 && (
                             <span className="ml-auto min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-primary text-white text-[10px] font-semibold rounded-full">
                               {unreadSupportCount > 9 ? "9+" : unreadSupportCount}
                             </span>
                           )}
-                          {(item.id === "domain" || item.id === "support") &&
-                            site.plan !== "paid" && (
-                              <Lock size={11} className="text-amber-400 ml-auto" />
-                            )}
+                          {item.id === "domain" && site.plan !== "paid" && (
+                            <Lock size={11} className="text-amber-400 ml-auto" />
+                          )}
                         </button>
                       );
                     })}
@@ -1105,7 +1103,6 @@ export default function SiteAdmin() {
                   <p className="text-xs text-slate-500 mb-4">Messages sent through your site's contact form.</p>
                   <Submissions
                     siteId={siteId}
-                    siteSlug={site.slug}
                     page={currentPage.filename}
                     forms={currentPage.forms}
                     onFormsChange={(updatedSite) => setSite(updatedSite)}
@@ -1137,29 +1134,28 @@ export default function SiteAdmin() {
                   />
                 ))}
 
-              {/* SEO */}
+              {/* SEO — audit + one-click fixes, then manual fine-tuning */}
               {activeSection === "seo" && site && (
-                <>
-                  <FaviconEditor
-                    siteId={site.siteId}
-                    favicon={site.favicon}
-                    previewBaseUrl={previewUrl}
-                    onSaved={(updated) => setSite(updated)}
-                  />
-                  <SEOEditor
-                    siteId={site.siteId}
-                    siteSlug={site.slug}
-                    pages={site.pages}
-                    onSaveSuccess={(updatedPages) => {
-                      setSite((prev: any) => ({ ...prev, pages: updatedPages }));
-                    }}
-                  />
-                </>
-              )}
+                <div className="space-y-10">
+                  <SiteSeoChecker siteId={site.siteId} pages={site.pages} onSiteUpdated={setSite} />
 
-              {/* SEO Checker */}
-              {activeSection === "seo-check" && site && (
-                <SiteSeoChecker siteId={site.siteId} pages={site.pages} />
+                  <div className="border-t border-slate-200 pt-8">
+                    <FaviconEditor
+                      siteId={site.siteId}
+                      favicon={site.favicon}
+                      previewBaseUrl={previewUrl}
+                      onSaved={(updated) => setSite(updated)}
+                    />
+                    <SEOEditor
+                      siteId={site.siteId}
+                      siteSlug={site.slug}
+                      pages={site.pages}
+                      onSaveSuccess={(updatedPages) => {
+                        setSite((prev: any) => ({ ...prev, pages: updatedPages }));
+                      }}
+                    />
+                  </div>
+                </div>
               )}
 
               {/* Analytics */}
@@ -1167,22 +1163,13 @@ export default function SiteAdmin() {
                 <AnalyticsChart siteId={siteId} />
               )}
 
-              {/* Expert Help */}
+              {/* Expert Help — free for all sites */}
               {activeSection === "support" && siteId && (
-                site.plan !== "paid" ? (
-                  <ProLockedGate
-                    title="Expert Help — PRO Feature"
-                    description="Chat with a verified expert and get changes made for you. Upgrade this site to PRO to unlock it, along with a custom domain and unlimited upload size."
-                    onUpgradeClick={handleUpgradeClick}
-                    upgrading={upgrading}
-                  />
-                ) : (
-                  <SupportSection
-                    siteId={siteId}
-                    hasSourceArchive={site.hasSourceArchive}
-                    onActiveRequestChange={setActiveSupportRequestId}
-                  />
-                )
+                <SupportSection
+                  siteId={siteId}
+                  hasSourceArchive={site.hasSourceArchive}
+                  onActiveRequestChange={setActiveSupportRequestId}
+                />
               )}
             </div>
           </div>

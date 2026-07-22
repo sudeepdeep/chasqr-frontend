@@ -31,7 +31,7 @@ const FAQS = [
   { q: "Is this SEO checker actually free?", a: "Yes — the checker itself is completely free, with no signup required, for anyone checking any public website." },
   { q: "Do I need a Chasqr account to use it?", a: "No. Paste a URL and get your report instantly. You only need an account if you want to host your own site on Chasqr." },
   { q: "How is the SEO score calculated?", a: "We run 20+ checks across meta data, page structure, content quality, links, social tags, and technical signals, then combine them into a single weighted score." },
-  { q: "Can I check any website, or only sites hosted on Chasqr?", a: "Any public website. For sites hosted on Chasqr, we also offer a deeper check that reads your files directly and, soon, one-click automatic fixes." },
+  { q: "Can I check any website, or only sites hosted on Chasqr?", a: "Any public website. For sites hosted on Chasqr, we also offer a deeper check that reads your files directly, plus one-click automatic fixes for common issues." },
 ];
 
 export default function SeoChecker() {
@@ -135,7 +135,7 @@ export default function SeoChecker() {
           </div>
 
           {showCta && (
-            <div className="lg:col-span-1">`
+            <div className="lg:col-span-1">
               <div className="lg:sticky lg:top-24 relative overflow-hidden bg-slate-900 rounded-2xl p-6">
                 <div className="absolute -top-16 -right-16 w-56 h-56 bg-primary/30 rounded-full blur-3xl pointer-events-none" />
                 <div className="relative">
@@ -143,15 +143,13 @@ export default function SeoChecker() {
                     <Wand2 size={22} className="text-primary-light" />
                   </div>
                   <h3 className="font-bebas text-2xl text-white mb-2">
-                    Fix these issues in seconds
+                    Fix these issues in one click
                   </h3>
                   <p className="text-slate-400 text-sm leading-relaxed mb-5">
-                    Host your site on Chasqr — free forever for the basics. You
-                    already get a built-in SEO Manager to fix titles,
-                    descriptions, and social tags by hand, and{" "}
-                    <strong className="text-slate-300">
-                      one-click automatic fixes are coming soon.
-                    </strong>
+                    Host your site on Chasqr — free forever for the basics — and hit{" "}
+                    <strong className="text-slate-300">Fix Issues Automatically</strong>.
+                    It sets your title, meta description, canonical, social preview
+                    tags, and image alt text, then redeploys — instantly.
                   </p>
                   <Link
                     to={user ? "/upload" : "/register"}

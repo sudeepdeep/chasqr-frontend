@@ -107,6 +107,9 @@ export const updateSEOAPI = (
   data: { page: string; title?: string; metaDescription?: string; ogImage?: string; ogTitle?: string; ogDescription?: string }
 ) => api.put(`/api/sites/${siteId}/seo`, data);
 
+export const seoAutofixAPI = (siteId: string, page: string) =>
+  api.post(`/api/sites/${siteId}/seo-fix`, { page });
+
 export const uploadAssetAPI = (siteId: string, formData: FormData) =>
   api.post(`/api/sites/${siteId}/assets`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },

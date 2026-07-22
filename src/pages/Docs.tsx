@@ -3,8 +3,10 @@ import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import {
   FileCode, FolderArchive, CheckCircle2, Rocket,
-  Globe, Lock, Clock, Layers, Headset,
+  Globe, Lock, Clock, Layers, Headset, Mail,
 } from "lucide-react";
+
+const API_URL = process.env.REACT_APP_API_URL || "https://api.chasqr.com";
 
 const SUPPORTED = [
   {
@@ -45,6 +47,7 @@ const SECTIONS = [
   { id: "how-to-deploy", label: "How to Deploy", icon: Rocket },
   { id: "supported-types", label: "Supported Project Types", icon: Layers },
   { id: "file-requirements", label: "File Requirements", icon: FileCode },
+  { id: "contact-forms", label: "Connect a Contact Form", icon: Mail },
   { id: "roadmap", label: "On the Roadmap", icon: Clock },
   { id: "get-help", label: "Get Expert Help", icon: Headset },
 ];
@@ -66,6 +69,14 @@ export default function Docs() {
 
     Object.values(sectionRefs.current).forEach((el) => el && observer.observe(el));
     return () => observer.disconnect();
+  }, []);
+
+  // Deep-link support: /docs#contact-forms scrolls straight to that section.
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (hash && sectionRefs.current[hash]) {
+      setTimeout(() => sectionRefs.current[hash]?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
+    }
   }, []);
 
   const scrollTo = (id: string) => {
@@ -215,6 +226,68 @@ export default function Docs() {
                   </p>
                 </div>
               </div>
+            </section>
+
+            {/* Connect a contact form */}
+            <section
+              id="contact-forms"
+              ref={(el) => { sectionRefs.current["contact-forms"] = el; }}
+              className="mb-14 scroll-mt-28"
+            >
+              <h2 className="font-bebas text-3xl text-slate-900 mb-2">Connect a Contact Form</h2>
+              <p className="text-sm text-slate-500 mb-5 leading-relaxed">
+                Chasqr captures submissions from any contact form on your site — every field lands in
+                your <span className="font-medium text-slate-700">Submissions</span> tab and is emailed to you.
+              </p>
+
+              <div className="p-4 bg-primary-light border border-primary/20 rounded-xl mb-6">
+                <p className="text-sm text-slate-700 leading-relaxed">
+                  <span className="font-semibold">Easiest way — no code:</span> if your uploaded HTML already has a
+                  form, open your site → <span className="font-medium">Submissions</span>, and it's auto-detected.
+                  Just click <span className="font-medium">Connect</span>. That's it.
+                </p>
+              </div>
+
+              <p className="text-sm font-semibold text-slate-700 mb-1">Manual setup</p>
+              <p className="text-sm text-slate-500 mb-3 leading-relaxed">
+                For full control, point your form at your site's submit endpoint:
+              </p>
+              <code className="block text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-mono text-slate-700 mb-2 overflow-x-auto">
+                {API_URL}/api/forms/&lt;your-site-id&gt;/submit
+              </code>
+              <p className="text-xs text-slate-400 mb-6">
+                Your <span className="font-medium">site ID</span> is the code in the dashboard URL while editing
+                your site (<span className="font-mono">/sites/&lt;id&gt;</span>) — the exact endpoint is also shown
+                in your Submissions tab.
+              </p>
+
+              <p className="text-sm font-semibold text-slate-700 mb-1">Option A — No code (page reloads on submit)</p>
+              <p className="text-sm text-slate-500 mb-2">Set your form's <code className="bg-slate-100 px-1 rounded text-xs">action</code> and <code className="bg-slate-100 px-1 rounded text-xs">method</code>. The optional hidden field redirects visitors back after sending:</p>
+              <pre className="text-[11px] bg-slate-900 text-slate-100 rounded-lg p-3 overflow-x-auto mb-6"><code>{`<form action="${API_URL}/api/forms/<your-site-id>/submit" method="POST">
+  <input type="hidden" name="_redirect" value="https://yoursite.chasqr.com/thank-you">
+  <!-- your existing fields — any names work -->
+  <button type="submit">Send</button>
+</form>`}</code></pre>
+
+              <p className="text-sm font-semibold text-slate-700 mb-1">Option B — Stay on the page (add a small script)</p>
+              <p className="text-sm text-slate-500 mb-2">Add <code className="bg-slate-100 px-1 rounded text-xs">data-chasqr-form</code> to your <code className="bg-slate-100 px-1 rounded text-xs">&lt;form&gt;</code> tag, then paste this before <code className="bg-slate-100 px-1 rounded text-xs">&lt;/body&gt;</code>:</p>
+              <pre className="text-[11px] bg-slate-900 text-slate-100 rounded-lg p-3 overflow-x-auto mb-4"><code>{`<script>
+document.querySelectorAll('[data-chasqr-form]').forEach(function(f){
+  f.addEventListener('submit', function(e){
+    e.preventDefault();
+    var data = Object.fromEntries(new FormData(f));
+    fetch("${API_URL}/api/forms/<your-site-id>/submit", {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(data)
+    }).then(function(){ f.reset(); alert('Thanks — your message was sent!'); });
+  });
+});
+</script>`}</code></pre>
+              <p className="text-xs text-slate-400">
+                Tip: fields need a <span className="font-mono">name</span> attribute to be captured. The one-click
+                Connect handles this for you automatically; for manual setup, make sure each field has one.
+              </p>
             </section>
 
             {/* Not yet supported */}

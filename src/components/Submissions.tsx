@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
-import { Mail, Trash2, Inbox, Code2, Copy, ChevronDown, FileSearch, Zap } from "lucide-react";
+import { Mail, Trash2, Inbox, Copy, FileSearch, Zap, BookOpen } from "lucide-react";
 import { getSubmissionsAPI, deleteSubmissionAPI, connectFormAPI } from "../api/site.api";
-import { publicSiteUrl } from "../lib/siteUrl";
 
 interface DetectedForm {
   key: string;
@@ -40,17 +40,15 @@ function guessName(fields: Record<string, string>): string {
 
 interface Props {
   siteId: string;
-  siteSlug?: string;
   page?: string;
   forms?: DetectedForm[];
   onFormsChange?: (site: any) => void;
 }
 
-export default function Submissions({ siteId, siteSlug, page, forms, onFormsChange }: Props) {
+export default function Submissions({ siteId, page, forms, onFormsChange }: Props) {
   const [items, setItems] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [connectOpen, setConnectOpen] = useState(false);
   const [togglingKey, setTogglingKey] = useState<string | null>(null);
 
   const toggleForm = async (formKey: string, connect: boolean) => {
@@ -89,14 +87,7 @@ export default function Submissions({ siteId, siteSlug, page, forms, onFormsChan
     }
   };
 
-  // Only lead with the manual instructions when there's nothing detected to
-  // one-click connect — otherwise the detected-forms list above is the answer.
-  useEffect(() => {
-    if (!loading && items.length === 0 && (!forms || forms.length === 0)) setConnectOpen(true);
-  }, [loading, items.length, forms]);
-
   const endpoint = `${API_URL}/api/forms/${siteId}/submit`;
-  const thanksUrl = siteSlug ? `${publicSiteUrl(siteSlug)}/` : "";
 
   const copy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -150,65 +141,25 @@ export default function Submissions({ siteId, siteSlug, page, forms, onFormsChan
         </div>
       )}
 
-      {/* Connect your own uploaded form */}
-      <div className="border border-slate-200 rounded-xl overflow-hidden">
-        <button onClick={() => setConnectOpen((o) => !o)} className="w-full flex items-center gap-2 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
-          <Code2 size={15} className="text-primary" />
-          Connect your own form
-          <ChevronDown size={15} className={`ml-auto text-slate-400 transition-transform ${connectOpen ? "rotate-180" : ""}`} />
-        </button>
-        {connectOpen && (
-          <div className="px-4 pb-4 pt-1 space-y-4 border-t border-slate-100">
-            <p className="text-xs text-slate-500">
-              Already have your own contact form in the uploaded HTML? Point it at this endpoint — any field names work, they'll all show up below.
-            </p>
-
-            <div>
-              <p className="text-xs font-semibold text-slate-600 mb-1">Your submit endpoint</p>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-mono text-slate-700 truncate">{endpoint}</code>
-                <button onClick={() => copy(endpoint, "Endpoint")} className="shrink-0 border border-slate-200 text-slate-500 hover:text-primary p-2 rounded-lg"><Copy size={13} /></button>
-              </div>
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold text-slate-600 mb-1">Option A — No code (page reloads on submit)</p>
-              <p className="text-xs text-slate-500 mb-1.5">Set your form's <code className="bg-slate-100 px-1 rounded">action</code> and <code className="bg-slate-100 px-1 rounded">method</code>, plus an optional hidden field to redirect back after sending:</p>
-              <div className="relative">
-                <pre className="text-[11px] bg-slate-900 text-slate-100 rounded-lg p-3 overflow-x-auto"><code>{`<form action="${endpoint}" method="POST">
-  <input type="hidden" name="_redirect" value="${thanksUrl || "https://yoursite.chasqr.com/thank-you"}">
-  <!-- your existing fields — any names work -->
-  <button type="submit">Send</button>
-</form>`}</code></pre>
-                <button onClick={() => copy(`<form action="${endpoint}" method="POST">\n  <input type="hidden" name="_redirect" value="${thanksUrl || "https://yoursite.chasqr.com/thank-you"}">\n  <!-- your existing fields — any names work -->\n  <button type="submit">Send</button>\n</form>`, "Snippet")} className="absolute top-2 right-2 text-slate-400 hover:text-white p-1"><Copy size={13} /></button>
-              </div>
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold text-slate-600 mb-1">Option B — Stay on the page (add this script once)</p>
-              <p className="text-xs text-slate-500 mb-1.5">Add <code className="bg-slate-100 px-1 rounded">data-chasqr-form</code> to your existing <code className="bg-slate-100 px-1 rounded">&lt;form&gt;</code> tag, then paste this before <code className="bg-slate-100 px-1 rounded">&lt;/body&gt;</code>:</p>
-              <div className="relative">
-                <pre className="text-[11px] bg-slate-900 text-slate-100 rounded-lg p-3 overflow-x-auto"><code>{`<script>
-document.querySelectorAll('[data-chasqr-form]').forEach(function(f){
-  f.addEventListener('submit', function(e){
-    e.preventDefault();
-    var data = Object.fromEntries(new FormData(f));
-    fetch("${endpoint}", {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(data)
-    }).then(function(){ f.reset(); alert('Thanks — your message was sent!'); });
-  });
-});
-</script>`}</code></pre>
-                <button onClick={() => copy(`<script>\ndocument.querySelectorAll('[data-chasqr-form]').forEach(function(f){\n  f.addEventListener('submit', function(e){\n    e.preventDefault();\n    var data = Object.fromEntries(new FormData(f));\n    fetch("${endpoint}", {\n      method: 'POST',\n      headers: {'Content-Type': 'application/json'},\n      body: JSON.stringify(data)\n    }).then(function(){ f.reset(); alert('Thanks — your message was sent!'); });\n  });\n});\n</script>`, "Script")} className="absolute top-2 right-2 text-slate-400 hover:text-white p-1"><Copy size={13} /></button>
-              </div>
-            </div>
-
-            <p className="text-[11px] text-slate-400">Add these via <span className="font-medium">Editor</span> or re-upload your HTML with the changes already made.</p>
+      {/* No form auto-detected — point them to the manual setup guide in the Docs */}
+      {(!forms || forms.length === 0) && (
+        <div className="border border-slate-200 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <FileSearch size={15} className="text-slate-400" />
+            <h3 className="font-semibold text-sm text-slate-800">No contact form detected on this page</h3>
           </div>
-        )}
-      </div>
+          <p className="text-xs text-slate-500 mb-3">
+            Have your own form (or one on another page)? Point it at this endpoint — any field names work, they'll all show up here:
+          </p>
+          <div className="flex items-center gap-2 mb-3">
+            <code className="flex-1 text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-mono text-slate-700 truncate">{endpoint}</code>
+            <button onClick={() => copy(endpoint, "Endpoint")} title="Copy endpoint" className="shrink-0 border border-slate-200 text-slate-500 hover:text-primary p-2 rounded-lg"><Copy size={13} /></button>
+          </div>
+          <Link to="/docs#contact-forms" className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline">
+            <BookOpen size={13} /> Full setup guide in the Docs
+          </Link>
+        </div>
+      )}
 
       {items.length === 0 ? (
         <div className="text-center py-16 border-2 border-dashed border-slate-200 rounded-2xl">
@@ -217,7 +168,7 @@ document.querySelectorAll('[data-chasqr-form]').forEach(function(f){
           <p className="text-slate-400 text-xs mt-1">
             {forms && forms.length > 0
               ? "Connect a form above, or add a Form block in the Layout tab — messages will appear here and land in your email."
-              : "Add a Form block in the Layout tab, or connect your own form above — messages will appear here and land in your email."}
+              : "Add a Form block in the Layout tab, or connect your own form (see the setup guide above) — messages will appear here and land in your email."}
           </p>
         </div>
       ) : (
