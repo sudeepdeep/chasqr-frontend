@@ -16,6 +16,8 @@ import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import Upload from './pages/Upload';
+import Build from './pages/Build';
+import Builder from './pages/Builder';
 import SiteAdmin from './pages/SiteAdmin';
 import AdminPanel from './pages/AdminPanel';
 import Transactions from './pages/Transactions';
@@ -25,6 +27,10 @@ import ProtectedRoute from './components/ProtectedRoute';
 const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
   { path: '/register', element: <Register /> },
+  {
+    path: '/sites/:siteId/builder',
+    element: <ProtectedRoute><Builder /></ProtectedRoute>,
+  },
   {
     path: '/',
     element: <AppLayout />,
@@ -47,6 +53,10 @@ const router = createBrowserRouter([
       {
         path: '/upload',
         element: <ProtectedRoute><Upload /></ProtectedRoute>,
+      },
+      {
+        path: '/build',
+        element: <ProtectedRoute><Build /></ProtectedRoute>,
       },
       {
         path: '/sites/:siteId',

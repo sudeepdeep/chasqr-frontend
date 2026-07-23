@@ -10,6 +10,9 @@ export const uploadFilesAPI = (formData: FormData) =>
     headers: { 'Content-Type': 'multipart/form-data' },
   });
 
+export const createBlankSiteAPI = (name: string, slug?: string) =>
+  api.post('/api/sites/create-blank', { name, slug });
+
 export const getMySitesAPI = () => api.get('/api/sites');
 
 export const getSiteAPI = (siteId: string) => api.get(`/api/sites/${siteId}`);
@@ -57,7 +60,9 @@ export const updateLayoutAPI = (
   page: string,
   layout: any[],
   layoutStyle?: { bg?: string },
-) => api.put(`/api/sites/${siteId}/layout`, { page, layout, layoutStyle });
+  nav?: any,
+  footer?: any,
+) => api.put(`/api/sites/${siteId}/layout`, { page, layout, layoutStyle, nav, footer });
 
 export const getSubmissionsAPI = (siteId: string) =>
   api.get(`/api/sites/${siteId}/submissions`);

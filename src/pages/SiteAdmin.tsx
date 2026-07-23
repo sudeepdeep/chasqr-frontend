@@ -1086,14 +1086,30 @@ export default function SiteAdmin() {
 
               {/* Layout builder */}
               {activeSection === "layout" && site && siteId && currentPage && (
-                <LayoutBuilder
-                  key={currentPage.filename}
-                  siteId={siteId}
-                  page={currentPage.filename}
-                  initialLayout={currentPage.layout}
-                  initialLayoutStyle={(currentPage as any).layoutStyle}
-                  onSaved={(updatedSite) => setSite(updatedSite)}
-                />
+                <div>
+                  <div className="mb-5 flex items-center justify-between gap-3 flex-wrap p-4 rounded-xl border border-primary/20 bg-primary-light/40">
+                    <div className="flex items-center gap-2 text-sm text-slate-600">
+                      <LayoutTemplate size={16} className="text-primary" />
+                      Design this page visually with the full-screen builder — a left palette of elements &amp; banners, drag-and-drop canvas, and modern effects.
+                    </div>
+                    <Link
+                      to={`/sites/${siteId}/builder?page=${encodeURIComponent(currentPage.filename)}`}
+                      className="shrink-0 flex items-center gap-1.5 bg-primary text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors"
+                    >
+                      <LayoutTemplate size={14} /> Open full-screen builder
+                    </Link>
+                  </div>
+                  <LayoutBuilder
+                    key={currentPage.filename}
+                    siteId={siteId}
+                    page={currentPage.filename}
+                    initialLayout={currentPage.layout}
+                    initialLayoutStyle={(currentPage as any).layoutStyle}
+                    initialNav={(currentPage as any).nav}
+                    initialFooter={(currentPage as any).footer}
+                    onSaved={(updatedSite) => setSite(updatedSite)}
+                  />
+                </div>
               )}
 
               {/* Form submissions */}

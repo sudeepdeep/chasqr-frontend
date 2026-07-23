@@ -63,6 +63,7 @@ export default function StyleToolbar({ style, onChange }: Props) {
 
   return (
     <div className="flex items-center gap-1 flex-wrap mt-2 p-1.5 bg-slate-50 border border-slate-200 rounded-lg">
+      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide pl-0.5 pr-1">Text</span>
       {/* Text color */}
       <label className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-slate-100 cursor-pointer relative" title="Text color">
         <span className="w-4 h-4 rounded-sm border border-slate-300" style={{ backgroundColor: color }} />
