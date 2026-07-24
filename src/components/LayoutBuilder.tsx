@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "react-toastify";
 import {
@@ -16,6 +16,7 @@ import {
   Heading as HeadingIcon, Film, PanelTop, PanelBottom, Link2,
   AlignLeft, AlignCenter, AlignRight, Ruler, MoveHorizontal,
   GalleryHorizontal, Wand2, ArrowLeft, ImagePlus, Layers, Square, ExternalLink,
+  LayoutGrid, CreditCard, Quote, Megaphone,
 } from "lucide-react";
 import StyleToolbar from "./StyleToolbar";
 import { updateLayoutAPI, uploadAssetAPI } from "../api/site.api";
@@ -23,17 +24,49 @@ import { updateLayoutAPI, uploadAssetAPI } from "../api/site.api";
 type BlockType = "text" | "heading" | "image" | "button" | "form" | "embed" | "carousel";
 type Align = "left" | "center" | "right";
 interface Block { id: string; type: BlockType; text?: string; src?: string; alt?: string; href?: string; target?: string; style?: string; align?: Align; images?: string[]; successMsg?: string; }
-interface Column { id: string; span: number; blocks: Block[]; }
+interface Column {
+  id: string; span: number; blocks: Block[];
+  // Card styling — turns a column into a visual card
+  bg?: string; pad?: number; radius?: number; shadow?: boolean;
+  borderW?: number; borderColor?: string; align?: Align;
+}
 interface Section {
   id: string; columns: Column[];
-  bg?: string; glass?: boolean; radius?: number; padY?: number; full?: boolean;
-  bgImage?: string; overlay?: string; minH?: number; shadow?: boolean;
+  bg?: string; glass?: boolean; radius?: number; padY?: number; padX?: number; full?: boolean; widthPct?: number;
+  mt?: number; mb?: number; ml?: number; mr?: number; borderW?: number; borderColor?: string;
+  bgImage?: string; overlay?: string; minH?: number; shadow?: boolean; font?: string;
 }
-interface LayoutStyle { bg?: string }
+interface LayoutStyle { bg?: string; font?: string }
+
+// Mirrors the allowlist in the backend renderer — only these are accepted.
+const GOOGLE_FONTS = [
+  "Inter", "Roboto", "Open Sans", "Lato", "Montserrat", "Poppins", "Raleway",
+  "Nunito", "Work Sans", "DM Sans", "Manrope", "Rubik", "Quicksand",
+  "Space Grotesk", "Source Sans 3", "Oswald", "Bebas Neue", "Merriweather",
+  "Playfair Display", "Lora",
+];
+
+/** Font dropdown shared by the page-level and section-level font pickers. */
+function FontSelect({ value, onChange, label }: { value?: string; onChange: (f?: string) => void; label: string }) {
+  return (
+    <label className="flex items-center gap-2 text-slate-600 text-xs">
+      {label}
+      <select
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value || undefined)}
+        style={value ? { fontFamily: value } : undefined}
+        className="text-xs bg-white border border-slate-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer max-w-[170px]"
+      >
+        <option value="">Default</option>
+        {GOOGLE_FONTS.map((f) => <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>)}
+      </select>
+    </label>
+  );
+}
 
 interface NavLink { id: string; label: string; href: string; }
-interface NavConfig { enabled: boolean; brand?: string; brandImg?: string; links: NavLink[]; bg?: string; color?: string; sticky?: boolean; glass?: boolean; shadow?: boolean; }
-interface FooterConfig { enabled: boolean; text?: string; links: NavLink[]; bg?: string; color?: string; }
+interface NavConfig { enabled: boolean; brand?: string; brandImg?: string; links: NavLink[]; bg?: string; color?: string; sticky?: boolean; glass?: boolean; shadow?: boolean; full?: boolean; widthPct?: number; minH?: number; radius?: number; mt?: number; mb?: number; ml?: number; mr?: number; }
+interface FooterConfig { enabled: boolean; text?: string; links: NavLink[]; bg?: string; color?: string; full?: boolean; widthPct?: number; minH?: number; radius?: number; mt?: number; mb?: number; ml?: number; mr?: number; }
 
 const emptyNav = (): NavConfig => ({ enabled: false, brand: "", links: [], bg: "#ffffff", color: "#0f172a", sticky: false });
 const emptyFooter = (): FooterConfig => ({ enabled: false, text: "", links: [], bg: "#0f172a", color: "#e2e8f0" });
@@ -57,9 +90,19 @@ function sectionPreviewStyle(sec: Section): React.CSSProperties {
   } else if (sec.bg) s.background = sec.bg;
   if (sec.radius) s.borderRadius = sec.radius;
   if (sec.shadow) s.boxShadow = "0 18px 40px -18px rgba(15,23,42,.35)";
+  // A custom width narrows the whole card (background included), not just its
+  // content — auto-centered unless an explicit left/right margin is given.
+  if (sec.widthPct) s.maxWidth = `${sec.widthPct}%`;
+  s.marginLeft = sec.ml != null ? sec.ml : (sec.widthPct ? "auto" : undefined);
+  s.marginRight = sec.mr != null ? sec.mr : (sec.widthPct ? "auto" : undefined);
   if (sec.minH) { s.minHeight = sec.minH; s.display = "flex"; s.flexDirection = "column"; s.justifyContent = "center"; }
   if (sec.padY != null) { s.paddingTop = sec.padY; s.paddingBottom = sec.padY; }
-  if (sec.glass || sec.bg || sec.bgImage) { s.paddingLeft = 20; s.paddingRight = 20; }
+  if (sec.padX != null) { s.paddingLeft = sec.padX; s.paddingRight = sec.padX; }
+  else if (sec.glass || sec.bg || sec.bgImage) { s.paddingLeft = 20; s.paddingRight = 20; }
+  if (sec.mt) s.marginTop = sec.mt;
+  if (sec.mb) s.marginBottom = sec.mb;
+  if (sec.borderW) s.border = `${sec.borderW}px solid ${sec.borderColor || "#e5e7eb"}`;
+  if (sec.font) s.fontFamily = sec.font;
   return s;
 }
 
@@ -112,9 +155,61 @@ function newSection(cols = 1): Section {
 }
 
 // Section presets ("banner" / composite blocks) inserted from the palette.
-type PresetKind = "image-banner" | "text-over-image" | "carousel" | "image-text";
+type PresetKind =
+  | "image-banner" | "text-over-image" | "carousel" | "image-text"
+  | "cards-image-3" | "cards-text-3" | "pricing-3" | "testimonials-3" | "cta";
+
+const uidBlock = (b: Omit<Block, "id">): Block => ({ id: uid(), ...b } as Block);
+
 function newPreset(kind: PresetKind): Section {
   const col = (span: number, blocks: Block[]): Column => ({ id: uid(), span, blocks });
+  // A column styled as a card (white surface, padding, rounding, soft shadow).
+  const card = (span: number, blocks: Block[], extra?: Partial<Column>): Column => ({
+    id: uid(), span, blocks,
+    bg: "#ffffff", pad: 24, radius: 16, shadow: true, align: "left", ...extra,
+  });
+
+  if (kind === "cards-image-3") {
+    const make = (title: string) => card(4, [
+      uidBlock({ type: "image", src: "", alt: "" }),
+      uidBlock({ type: "heading", text: title, style: "font-size: 1.25rem" }),
+      uidBlock({ type: "text", text: "A short description of this feature or service goes here." }),
+    ]);
+    return { id: uid(), padY: 48, columns: [make("First card"), make("Second card"), make("Third card")] };
+  }
+  if (kind === "cards-text-3") {
+    const make = (title: string) => card(4, [
+      uidBlock({ type: "heading", text: title, style: "font-size: 1.25rem" }),
+      uidBlock({ type: "text", text: "Explain the idea in a sentence or two — no image needed." }),
+    ], { align: "center" });
+    return { id: uid(), padY: 48, columns: [make("Simple"), make("Fast"), make("Reliable")] };
+  }
+  if (kind === "pricing-3") {
+    const make = (plan: string, price: string, highlight?: boolean) => card(4, [
+      uidBlock({ type: "heading", text: plan, style: "font-size: 1.1rem" }),
+      uidBlock({ type: "heading", text: price, style: "font-size: 2.5rem" }),
+      uidBlock({ type: "text", text: "Everything you need to get started.\nUnlimited projects\nEmail support" }),
+      uidBlock({ type: "button", text: "Choose plan", href: "#", align: "center" }),
+    ], { align: "center", ...(highlight ? { borderW: 2, borderColor: "#2563EB" } : {}) });
+    return { id: uid(), padY: 48, columns: [make("Starter", "$0"), make("Pro", "$19", true), make("Team", "$49")] };
+  }
+  if (kind === "testimonials-3") {
+    const make = (name: string) => card(4, [
+      uidBlock({ type: "text", text: "“This product completely changed how our team works. Setup took minutes.”", style: "font-style: italic" }),
+      uidBlock({ type: "text", text: name, style: "font-weight: bold" }),
+    ]);
+    return { id: uid(), padY: 48, columns: [make("Alex Doe"), make("Sam Ray"), make("Jo Kim")] };
+  }
+  if (kind === "cta") {
+    return {
+      id: uid(), full: true, padY: 64, bg: "linear-gradient(135deg,#2563EB,#7c3aed)",
+      columns: [col(12, [
+        uidBlock({ type: "heading", text: "Ready to get started?", align: "center", style: "color: #ffffff; font-size: 2.25rem" }),
+        uidBlock({ type: "text", text: "Join thousands already building with us.", align: "center", style: "color: #e0e7ff" }),
+        uidBlock({ type: "button", text: "Get started free", href: "#", align: "center" }),
+      ])],
+    };
+  }
   if (kind === "image-banner") {
     return { id: uid(), full: true, columns: [col(12, [newBlock("image")])] };
   }
@@ -162,9 +257,41 @@ export default function LayoutBuilder({ siteId, page, initialLayout, initialLayo
   const [navOpen, setNavOpen] = useState(false);
   const [footerOpen, setFooterOpen] = useState(false);
   const [activeColumnId, setActiveColumnId] = useState<string | null>(null); // where palette elements land
+  const [focusId, setFocusId] = useState<string | null>(null); // just-added section/block: scroll to it + flash a ring
+
+  // Scroll the newly added section/block into view, then drop the highlight.
+  useEffect(() => {
+    if (!focusId) return;
+    // Small delay so the new node is laid out (framer-motion) before scrolling.
+    const scroll = setTimeout(() => {
+      document.querySelector(`[data-cq-id="${focusId}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 60);
+    const clear = setTimeout(() => setFocusId(null), 1600);
+    return () => { clearTimeout(scroll); clearTimeout(clear); };
+  }, [focusId]);
 
   const patchNav = (p: Partial<NavConfig>) => { setNav((n) => ({ ...n, ...p })); setDirty(true); };
   const patchFooter = (p: Partial<FooterConfig>) => { setFooter((f) => ({ ...f, ...p })); setDirty(true); };
+
+  // Load the Google Fonts in use so the canvas previews them accurately.
+  useEffect(() => {
+    const used = Array.from(new Set(
+      [layoutStyle.font, ...sections.map((s) => s.font)].filter(Boolean) as string[]
+    ));
+    if (!used.length) return;
+    const href = `https://fonts.googleapis.com/css2?${used
+      .map((f) => `family=${f.replace(/ /g, "+")}:wght@300;400;500;600;700`)
+      .join("&")}&display=swap`;
+    let link = document.getElementById("chasqr-builder-fonts") as HTMLLinkElement | null;
+    if (!link) {
+      link = document.createElement("link");
+      link.id = "chasqr-builder-fonts";
+      link.rel = "stylesheet";
+      document.head.appendChild(link);
+    }
+    if (link.href !== href) link.href = href;
+  }, [layoutStyle.font, sections]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -174,7 +301,8 @@ export default function LayoutBuilder({ siteId, page, initialLayout, initialLayo
   const addSection = () => update([...sections, newSection(1)]);
   const removeSection = (sid: string) => update(sections.filter((s) => s.id !== sid));
   const patchSection = (sid: string, patch: Partial<Section>) => update(sections.map((s) => s.id === sid ? { ...s, ...patch } : s));
-  const setLayoutBg = (bg: string | undefined) => { setLayoutStyle(bg ? { bg } : {}); setDirty(true); };
+  const patchLayoutStyle = (p: Partial<LayoutStyle>) => { setLayoutStyle((s) => ({ ...s, ...p })); setDirty(true); };
+  const setLayoutBg = (bg: string | undefined) => patchLayoutStyle({ bg });
   const moveSection = (idx: number, dir: -1 | 1) => {
     const j = idx + dir;
     if (j < 0 || j >= sections.length) return;
@@ -200,6 +328,9 @@ export default function LayoutBuilder({ siteId, page, initialLayout, initialLayo
     columns[i].span = a;
     columns[i + 1].span = pair - a;
     return { ...s, columns };
+  }));
+  const patchColumn = (sid: string, cid: string, patch: Partial<Column>) => update(sections.map((s) => s.id !== sid ? s : {
+    ...s, columns: s.columns.map((c) => c.id !== cid ? c : { ...c, ...patch }),
   }));
   const addBlock = (sid: string, cid: string, type: BlockType) => update(sections.map((s) => s.id !== sid ? s : {
     ...s, columns: s.columns.map((c) => c.id !== cid ? c : { ...c, blocks: [...c.blocks, newBlock(type)] }),
@@ -331,8 +462,11 @@ export default function LayoutBuilder({ siteId, page, initialLayout, initialLayo
             <button key={g} onClick={() => setLayoutBg(g)} title="Gradient" className="w-8 h-8 rounded-md border border-slate-300" style={{ background: g }} />
           ))}
           {layoutStyle.bg && (
-            <button onClick={() => setLayoutBg(undefined)} className="text-xs text-slate-500 hover:text-red-500 ml-auto">Clear</button>
+            <button onClick={() => setLayoutBg(undefined)} className="text-xs text-slate-500 hover:text-red-500">Clear</button>
           )}
+          <span className="w-px h-6 bg-slate-200 mx-1" />
+          <FontSelect label="Page font" value={layoutStyle.font} onChange={(font) => patchLayoutStyle({ font })} />
+          <span className="text-[11px] text-slate-400">Applies to the whole page — sections can override it.</span>
         </div>
       )}
       {navOpen && <NavEditor nav={nav} onPatch={patchNav} />}
@@ -352,7 +486,10 @@ export default function LayoutBuilder({ siteId, page, initialLayout, initialLayo
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragEnd={onDragEnd}>
       <div
         className={`mx-auto transition-all ${device === "mobile" ? "max-w-[420px]" : "max-w-full"} ${layoutStyle.bg ? "p-4 rounded-2xl" : ""}`}
-        style={layoutStyle.bg ? { background: layoutStyle.bg } : undefined}
+        style={{
+          ...(layoutStyle.bg ? { background: layoutStyle.bg } : {}),
+          ...(layoutStyle.font ? { fontFamily: layoutStyle.font } : {}),
+        }}
       >
         {nav.enabled && <NavPreview nav={nav} onEdit={() => { setNavOpen(true); setFooterOpen(false); }} />}
         {sections.map((section, si) => (
@@ -395,6 +532,7 @@ export default function LayoutBuilder({ siteId, page, initialLayout, initialLayo
                 device={device}
                 activeColumnId={activeColumnId}
                 onSelectColumn={setActiveColumnId}
+                onPatchColumn={(cid, patch) => patchColumn(section.id, cid, patch)}
                 onResize={(i, spanI) => setColumnSpans(section.id, i, spanI)}
                 onAddBlock={(cid, t) => addBlock(section.id, cid, t)}
                 onRemoveColumn={(cid) => removeColumn(section.id, cid)}
@@ -507,19 +645,20 @@ function SectionSettings({ section, onPatch, siteId }: { section: Section; onPat
     </button>
   );
   const groupLabel = (t: string) => <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-2">{t}</p>;
+  const slider = (label: string, value: number | undefined, max: number, key: keyof Section, step = 4) => (
+    <label className="flex items-center gap-2 text-slate-600 text-xs">
+      {label}
+      <input type="range" min={0} max={max} step={step} value={value ?? 0} onChange={(e) => onPatch({ [key]: Number(e.target.value) || undefined } as Partial<Section>)} className="accent-primary w-20" />
+      <span className="w-9 text-right font-mono text-slate-500">{value ? `${value}px` : "0"}</span>
+    </label>
+  );
   return (
     <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 divide-y divide-slate-200 text-sm">
       {/* Size & layout */}
       <div className="p-3">
         {groupLabel("Size & layout")}
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-          <div className="flex items-center gap-2">
-            <span className="text-slate-600 text-xs">Width</span>
-            <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden bg-white">
-              <button onClick={() => onPatch({ full: false })} className={`px-2.5 py-1 text-xs ${!section.full ? "bg-primary text-white" : "text-slate-500 hover:bg-slate-50"}`}>Contained</button>
-              <button onClick={() => onPatch({ full: true })} className={`px-2.5 py-1 text-xs flex items-center gap-1 ${section.full ? "bg-primary text-white" : "text-slate-500 hover:bg-slate-50"}`}><MoveHorizontal size={11} /> Full width</button>
-            </div>
-          </div>
+          <WidthControl full={section.full} widthPct={section.widthPct} onChange={onPatch} />
           <label className="flex items-center gap-2 text-slate-600 text-xs">
             Height
             <input type="range" min={0} max={700} step={20} value={section.minH ?? 0} onChange={(e) => onPatch({ minH: Number(e.target.value) || undefined })} className="accent-primary w-28" />
@@ -529,10 +668,35 @@ function SectionSettings({ section, onPatch, siteId }: { section: Section; onPat
             Rounded
             <input type="range" min={0} max={40} value={section.radius || 0} onChange={(e) => onPatch({ radius: Number(e.target.value) })} className="accent-primary w-20" />
           </label>
+        </div>
+      </div>
+
+      {/* Spacing & border */}
+      <div className="p-3">
+        {groupLabel("Spacing & border")}
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          {slider("Margin top", section.mt, 200, "mt")}
+          {slider("Margin bottom", section.mb, 200, "mb")}
+          {slider("Margin left", section.ml, 300, "ml")}
+          {slider("Margin right", section.mr, 300, "mr")}
+          {slider("Padding Y", section.padY, 160, "padY")}
+          {slider("Padding X", section.padX, 200, "padX")}
           <label className="flex items-center gap-2 text-slate-600 text-xs">
-            Padding
-            <input type="range" min={0} max={80} value={section.padY ?? 0} onChange={(e) => onPatch({ padY: Number(e.target.value) })} className="accent-primary w-20" />
+            Border
+            <input type="range" min={0} max={12} value={section.borderW ?? 0} onChange={(e) => onPatch({ borderW: Number(e.target.value) || undefined })} className="accent-primary w-16" />
+            <span className="relative w-6 h-6 rounded border border-slate-300 inline-block cursor-pointer" style={{ background: section.borderColor || "#e5e7eb" }}>
+              <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(section.borderColor || "") ? section.borderColor : "#e5e7eb"} onChange={(e) => onPatch({ borderColor: e.target.value })} className="absolute inset-0 opacity-0 cursor-pointer" />
+            </span>
           </label>
+        </div>
+      </div>
+
+      {/* Typography */}
+      <div className="p-3">
+        {groupLabel("Typography")}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+          <FontSelect label="Font" value={section.font} onChange={(font) => onPatch({ font })} />
+          <span className="text-[11px] text-slate-400">Overrides the page font for this section only.</span>
         </div>
       </div>
 
@@ -582,11 +746,12 @@ function SectionSettings({ section, onPatch, siteId }: { section: Section; onPat
 
 // ── Section row: columns + snap-resize dividers ──────────────────────────────
 function SectionRow({
-  section, device, activeColumnId, onSelectColumn, onResize, onAddBlock, onRemoveColumn, canRemoveColumn, onPatchBlock, onRemoveBlock, siteId,
+  section, device, activeColumnId, onSelectColumn, onPatchColumn, onResize, onAddBlock, onRemoveColumn, canRemoveColumn, onPatchBlock, onRemoveBlock, siteId,
 }: {
   section: Section; device: "desktop" | "mobile";
   activeColumnId: string | null;
   onSelectColumn: (cid: string) => void;
+  onPatchColumn: (cid: string, patch: Partial<Column>) => void;
   onResize: (i: number, spanI: number) => void;
   onAddBlock: (cid: string, t: BlockType) => void;
   onRemoveColumn: (cid: string) => void;
@@ -626,6 +791,7 @@ function SectionRow({
             col={col} device={device}
             active={activeColumnId === col.id}
             onSelect={() => onSelectColumn(col.id)}
+            onPatchColumn={(patch) => onPatchColumn(col.id, patch)}
             onAddBlock={(t) => onAddBlock(col.id, t)}
             onRemoveColumn={canRemoveColumn ? () => onRemoveColumn(col.id) : undefined}
             onPatchBlock={onPatchBlock} onRemoveBlock={onRemoveBlock} siteId={siteId}
@@ -648,11 +814,12 @@ function SectionRow({
 
 // ── Column: droppable + sortable list of blocks ──────────────────────────────
 function ColumnCell({
-  col, device, active, onSelect, onAddBlock, onRemoveColumn, onPatchBlock, onRemoveBlock, siteId,
+  col, device, active, onSelect, onPatchColumn, onAddBlock, onRemoveColumn, onPatchBlock, onRemoveBlock, siteId,
 }: {
   col: Column; device: "desktop" | "mobile";
   active: boolean;
   onSelect: () => void;
+  onPatchColumn: (patch: Partial<Column>) => void;
   onAddBlock: (t: BlockType) => void;
   onRemoveColumn?: () => void;
   onPatchBlock: (bid: string, patch: Partial<Block>) => void;
@@ -660,6 +827,17 @@ function ColumnCell({
   siteId: string;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col:${col.id}` });
+  const [cardOpen, setCardOpen] = useState(false);
+  const isCard = !!(col.bg || col.pad || col.radius || col.shadow || col.borderW);
+  // Mirrors the renderer so the card look is visible while editing.
+  const cardStyle: React.CSSProperties = {};
+  if (col.bg) cardStyle.background = col.bg;
+  if (col.pad) cardStyle.padding = col.pad;
+  if (col.radius) cardStyle.borderRadius = col.radius;
+  if (col.shadow) cardStyle.boxShadow = "0 14px 34px -16px rgba(15,23,42,.35)";
+  if (col.borderW) cardStyle.border = `${col.borderW}px solid ${col.borderColor || "#e5e7eb"}`;
+  if (col.align) cardStyle.textAlign = col.align;
+
   return (
     <div
       ref={setNodeRef}
@@ -670,15 +848,26 @@ function ColumnCell({
         : "border-slate-200 bg-slate-50"
       }`}
     >
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center gap-1 mb-2">
         {device === "desktop" && <span className="text-[10px] font-mono text-slate-400">{col.span}/12{active && <span className="text-primary ml-1">• active</span>}</span>}
+        <button
+          onClick={() => setCardOpen((o) => !o)}
+          title="Card style for this column"
+          className={`ml-auto flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
+            cardOpen || isCard ? "border-primary text-primary bg-primary-light" : "border-slate-200 text-slate-400 hover:text-primary"
+          }`}
+        >
+          <Square size={10} /> Card
+        </button>
         {onRemoveColumn && (
-          <button onClick={onRemoveColumn} title="Remove column" className="text-slate-300 hover:text-red-500 ml-auto"><Trash2 size={12} /></button>
+          <button onClick={onRemoveColumn} title="Remove column" className="text-slate-300 hover:text-red-500"><Trash2 size={12} /></button>
         )}
       </div>
 
+      {cardOpen && <ColumnCardSettings col={col} onPatch={onPatchColumn} />}
+
       <SortableContext items={col.blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
-        <div className="space-y-2">
+        <div className="space-y-2" style={cardStyle}>
           {col.blocks.map((b) => (
             <SortableBlock key={b.id} block={b} onPatch={onPatchBlock} onRemove={onRemoveBlock} siteId={siteId} />
           ))}
@@ -691,6 +880,60 @@ function ColumnCell({
             <Icon size={11} /> {t}
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Card styling for a single column (background, padding, rounding, border) ──
+function ColumnCardSettings({ col, onPatch }: { col: Column; onPatch: (p: Partial<Column>) => void }) {
+  const isCard = !!(col.bg || col.pad || col.radius || col.shadow || col.borderW);
+  return (
+    <div className="mb-2 p-2 rounded-lg border border-slate-200 bg-white space-y-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          onClick={() => onPatch(isCard
+            ? { bg: undefined, pad: undefined, radius: undefined, shadow: undefined, borderW: undefined }
+            : { bg: "#ffffff", pad: 24, radius: 16, shadow: true })}
+          className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${isCard ? "bg-primary text-white" : "bg-slate-100 text-slate-600 hover:text-primary"}`}
+        >
+          {isCard ? "Card on" : "Make a card"}
+        </button>
+        <label className="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer">
+          Bg
+          <span className="relative w-5 h-5 rounded border border-slate-300 inline-block" style={{ background: col.bg || "#ffffff" }}>
+            <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(col.bg || "") ? col.bg : "#ffffff"} onChange={(e) => onPatch({ bg: e.target.value })} className="absolute inset-0 opacity-0 cursor-pointer" />
+          </span>
+        </label>
+        <button onClick={() => onPatch({ shadow: !col.shadow })} className={`text-[10px] px-2 py-0.5 rounded-full ${col.shadow ? "bg-primary text-white" : "bg-slate-100 text-slate-600 hover:text-primary"}`}>Shadow</button>
+        <div className="flex items-center gap-0.5 ml-auto">
+          {(["left", "center", "right"] as const).map((a) => {
+            const Icon = a === "left" ? AlignLeft : a === "center" ? AlignCenter : AlignRight;
+            return (
+              <button key={a} onClick={() => onPatch({ align: col.align === a ? undefined : a })} title={`Align ${a}`}
+                className={`w-6 h-6 flex items-center justify-center rounded ${col.align === a ? "bg-primary text-white" : "text-slate-400 hover:bg-slate-100"}`}>
+                <Icon size={11} />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div className="flex items-center gap-3 flex-wrap">
+        <label className="flex items-center gap-1 text-[10px] text-slate-500">
+          Pad
+          <input type="range" min={0} max={64} step={4} value={col.pad ?? 0} onChange={(e) => onPatch({ pad: Number(e.target.value) || undefined })} className="accent-primary w-16" />
+        </label>
+        <label className="flex items-center gap-1 text-[10px] text-slate-500">
+          Round
+          <input type="range" min={0} max={40} value={col.radius ?? 0} onChange={(e) => onPatch({ radius: Number(e.target.value) || undefined })} className="accent-primary w-16" />
+        </label>
+        <label className="flex items-center gap-1 text-[10px] text-slate-500">
+          Border
+          <input type="range" min={0} max={8} value={col.borderW ?? 0} onChange={(e) => onPatch({ borderW: Number(e.target.value) || undefined })} className="accent-primary w-12" />
+          <span className="relative w-5 h-5 rounded border border-slate-300 inline-block" style={{ background: col.borderColor || "#e5e7eb" }}>
+            <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(col.borderColor || "") ? col.borderColor : "#e5e7eb"} onChange={(e) => onPatch({ borderColor: e.target.value })} className="absolute inset-0 opacity-0 cursor-pointer" />
+          </span>
+        </label>
       </div>
     </div>
   );
@@ -869,7 +1112,16 @@ function BoxToolbar({ block, onPatch }: { block: Block; onPatch: (bid: string, p
   };
   const align = block.align || "";
   const width = st["width"] || "";
-  const height = st["min-height"] || "";
+  // Height sets `height` (not min-height) so it can shrink elements that have an
+  // intrinsic ratio — a carousel is 16/9 and min-height could never reduce it.
+  // Older blocks stored min-height, so read that as a fallback.
+  const height = st["height"] || st["min-height"] || "";
+  const setHeight = (v: string) => {
+    const next = { ...st };
+    delete next["min-height"];
+    if (v) next["height"] = v; else delete next["height"];
+    onPatch(block.id, { style: serializeStyleMap(next) });
+  };
   const isPresetWidth = WIDTHS.some((w) => w.value === width);
 
   const alignBtn = (a: Align, Icon: any) => (
@@ -912,16 +1164,44 @@ function BoxToolbar({ block, onPatch }: { block: Block; onPatch: (bid: string, p
         )}
       </div>
       <span className="w-px h-5 bg-slate-200" />
-      <label className="flex items-center gap-1 text-[11px] text-slate-500" title="Minimum height">
+      <label className="flex items-center gap-1 text-[11px] text-slate-500" title="Height — e.g. 300px or 50vh">
         H
         <input
           value={height}
-          onChange={(e) => setStyleProp("min-height", e.target.value || null)}
+          onChange={(e) => setHeight(e.target.value)}
           placeholder="auto"
           className="w-16 text-xs border border-slate-200 rounded-md px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
         />
       </label>
     </div>
+  );
+}
+
+// ── Shared width control: Contained | Custom (% slider) | Full width ─────────
+// Used by sections, the navbar and the footer so "width" behaves identically
+// everywhere: a custom % narrows the whole box (background included) and centers it.
+function WidthControl({ full, widthPct, onChange }: {
+  full?: boolean;
+  widthPct?: number;
+  onChange: (p: { full?: boolean; widthPct?: number }) => void;
+}) {
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <span className="text-slate-600 text-xs">Width</span>
+        <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden bg-white">
+          <button onClick={() => onChange({ full: false, widthPct: undefined })} className={`px-2.5 py-1 text-xs ${!full && !widthPct ? "bg-primary text-white" : "text-slate-500 hover:bg-slate-50"}`}>Contained</button>
+          <button onClick={() => onChange({ full: false, widthPct: widthPct ?? 60 })} className={`px-2.5 py-1 text-xs ${widthPct ? "bg-primary text-white" : "text-slate-500 hover:bg-slate-50"}`}>Custom</button>
+          <button onClick={() => onChange({ full: true, widthPct: undefined })} className={`px-2.5 py-1 text-xs flex items-center gap-1 ${full ? "bg-primary text-white" : "text-slate-500 hover:bg-slate-50"}`}><MoveHorizontal size={11} /> Full width</button>
+        </div>
+      </div>
+      {widthPct != null && (
+        <label className="flex items-center gap-2 text-slate-600 text-xs">
+          <input type="range" min={5} max={100} step={5} value={widthPct} onChange={(e) => onChange({ full: false, widthPct: Number(e.target.value) })} className="accent-primary w-28" />
+          <span className="w-9 text-right font-mono text-slate-500">{widthPct}%</span>
+        </label>
+      )}
+    </>
   );
 }
 
@@ -992,6 +1272,13 @@ function NavEditor({ nav, onPatch }: { nav: NavConfig; onPatch: (p: Partial<NavC
           </div>
           <div className="flex flex-wrap items-center gap-5 pt-1">
             <ColorField label="Background" value={nav.bg} fallback="#ffffff" onChange={(v) => onPatch({ bg: v })} />
+            <button
+              onClick={() => onPatch({ bg: nav.bg === "transparent" ? "#ffffff" : "transparent" })}
+              title="Let the layout background show through the navbar"
+              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${nav.bg === "transparent" ? "bg-primary text-white" : "bg-white border border-slate-200 text-slate-600 hover:text-primary"}`}
+            >
+              Transparent
+            </button>
             <ColorField label="Text" value={nav.color} fallback="#0f172a" onChange={(v) => onPatch({ color: v })} />
             <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
               <input type="checkbox" checked={!!nav.sticky} onChange={(e) => onPatch({ sticky: e.target.checked })} className="accent-primary w-4 h-4" />
@@ -1006,7 +1293,41 @@ function NavEditor({ nav, onPatch }: { nav: NavConfig; onPatch: (p: Partial<NavC
             <button onClick={() => onPatch({ shadow: !nav.shadow })} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${nav.shadow ? "bg-primary text-white" : "bg-white border border-slate-200 text-slate-600 hover:text-primary"}`}>
               <Layers size={12} /> Shadow
             </button>
-            {nav.glass && <span className="text-[11px] text-slate-400 w-full">Frosted translucent bar. Turn on <strong>Sticky on scroll</strong> so it frosts the content passing beneath it. Pick a light or dark <em>Text</em> color to suit your background.</span>}
+            {nav.glass && <span className="text-[11px] text-slate-400 w-full">Frosted translucent bar — it picks up the <strong>Layout background</strong> behind it. Turn on <strong>Sticky on scroll</strong> so it frosts content passing beneath, and pick a light or dark <em>Text</em> color to suit.</span>}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-3 border-t border-slate-200">
+            <span className="text-xs font-medium text-slate-500 flex items-center gap-1"><Ruler size={12} /> Size &amp; shape</span>
+            <WidthControl full={nav.full} widthPct={nav.widthPct} onChange={onPatch} />
+            <label className="flex items-center gap-2 text-slate-600 text-xs">
+              Height
+              <input type="range" min={0} max={160} step={4} value={nav.minH ?? 0} onChange={(e) => onPatch({ minH: Number(e.target.value) || undefined })} className="accent-primary w-24" />
+              <span className="w-10 text-right font-mono text-slate-500">{nav.minH ? `${nav.minH}px` : "auto"}</span>
+            </label>
+            <label className="flex items-center gap-2 text-slate-600 text-xs">
+              Rounded
+              <input type="range" min={0} max={40} value={nav.radius ?? 0} onChange={(e) => onPatch({ radius: Number(e.target.value) || undefined })} className="accent-primary w-20" />
+            </label>
+            <label className="flex items-center gap-2 text-slate-600 text-xs">
+              Margin top
+              <input type="range" min={0} max={120} step={4} value={nav.mt ?? 0} onChange={(e) => onPatch({ mt: Number(e.target.value) || undefined })} className="accent-primary w-20" />
+              <span className="w-9 text-right font-mono text-slate-500">{nav.mt ? `${nav.mt}px` : "0"}</span>
+            </label>
+            <label className="flex items-center gap-2 text-slate-600 text-xs">
+              Margin bottom
+              <input type="range" min={0} max={120} step={4} value={nav.mb ?? 0} onChange={(e) => onPatch({ mb: Number(e.target.value) || undefined })} className="accent-primary w-20" />
+              <span className="w-9 text-right font-mono text-slate-500">{nav.mb ? `${nav.mb}px` : "0"}</span>
+            </label>
+            <label className="flex items-center gap-2 text-slate-600 text-xs">
+              Margin left
+              <input type="range" min={0} max={300} step={4} value={nav.ml ?? 0} onChange={(e) => onPatch({ ml: Number(e.target.value) || undefined })} className="accent-primary w-20" />
+              <span className="w-9 text-right font-mono text-slate-500">{nav.ml ? `${nav.ml}px` : "auto"}</span>
+            </label>
+            <label className="flex items-center gap-2 text-slate-600 text-xs">
+              Margin right
+              <input type="range" min={0} max={300} step={4} value={nav.mr ?? 0} onChange={(e) => onPatch({ mr: Number(e.target.value) || undefined })} className="accent-primary w-20" />
+              <span className="w-9 text-right font-mono text-slate-500">{nav.mr ? `${nav.mr}px` : "auto"}</span>
+            </label>
           </div>
         </>
       )}
@@ -1040,6 +1361,40 @@ function FooterEditor({ footer, onPatch }: { footer: FooterConfig; onPatch: (p: 
             <ColorField label="Background" value={footer.bg} fallback="#0f172a" onChange={(v) => onPatch({ bg: v })} />
             <ColorField label="Text" value={footer.color} fallback="#e2e8f0" onChange={(v) => onPatch({ color: v })} />
           </div>
+
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-3 border-t border-slate-200">
+            <span className="text-xs font-medium text-slate-500 flex items-center gap-1"><Ruler size={12} /> Size &amp; shape</span>
+            <WidthControl full={footer.full} widthPct={footer.widthPct} onChange={onPatch} />
+            <label className="flex items-center gap-2 text-slate-600 text-xs">
+              Height
+              <input type="range" min={0} max={300} step={10} value={footer.minH ?? 0} onChange={(e) => onPatch({ minH: Number(e.target.value) || undefined })} className="accent-primary w-24" />
+              <span className="w-10 text-right font-mono text-slate-500">{footer.minH ? `${footer.minH}px` : "auto"}</span>
+            </label>
+            <label className="flex items-center gap-2 text-slate-600 text-xs">
+              Rounded
+              <input type="range" min={0} max={40} value={footer.radius ?? 0} onChange={(e) => onPatch({ radius: Number(e.target.value) || undefined })} className="accent-primary w-20" />
+            </label>
+            <label className="flex items-center gap-2 text-slate-600 text-xs">
+              Margin top
+              <input type="range" min={0} max={120} step={4} value={footer.mt ?? 0} onChange={(e) => onPatch({ mt: Number(e.target.value) || undefined })} className="accent-primary w-20" />
+              <span className="w-9 text-right font-mono text-slate-500">{footer.mt ? `${footer.mt}px` : "0"}</span>
+            </label>
+            <label className="flex items-center gap-2 text-slate-600 text-xs">
+              Margin bottom
+              <input type="range" min={0} max={120} step={4} value={footer.mb ?? 0} onChange={(e) => onPatch({ mb: Number(e.target.value) || undefined })} className="accent-primary w-20" />
+              <span className="w-9 text-right font-mono text-slate-500">{footer.mb ? `${footer.mb}px` : "0"}</span>
+            </label>
+            <label className="flex items-center gap-2 text-slate-600 text-xs">
+              Margin left
+              <input type="range" min={0} max={300} step={4} value={footer.ml ?? 0} onChange={(e) => onPatch({ ml: Number(e.target.value) || undefined })} className="accent-primary w-20" />
+              <span className="w-9 text-right font-mono text-slate-500">{footer.ml ? `${footer.ml}px` : "auto"}</span>
+            </label>
+            <label className="flex items-center gap-2 text-slate-600 text-xs">
+              Margin right
+              <input type="range" min={0} max={300} step={4} value={footer.mr ?? 0} onChange={(e) => onPatch({ mr: Number(e.target.value) || undefined })} className="accent-primary w-20" />
+              <span className="w-9 text-right font-mono text-slate-500">{footer.mr ? `${footer.mr}px` : "auto"}</span>
+            </label>
+          </div>
         </>
       )}
     </div>
@@ -1048,21 +1403,35 @@ function FooterEditor({ footer, onPatch }: { footer: FooterConfig; onPatch: (p: 
 
 // ── Live preview of the navbar in the canvas (click to edit) ──────────────────
 function NavPreview({ nav, onEdit }: { nav: NavConfig; onEdit: () => void }) {
+  const barStyle: React.CSSProperties = nav.glass
+    ? { background: "rgba(255,255,255,0.35)", backdropFilter: "saturate(180%) blur(14px)", WebkitBackdropFilter: "saturate(180%) blur(14px)", borderBottom: "1px solid rgba(255,255,255,0.25)", color: nav.color || "#0f172a" }
+    : { background: nav.bg || "#ffffff", color: nav.color || "#0f172a" };
+  if (nav.minH) barStyle.minHeight = nav.minH;
+  if (nav.radius) barStyle.borderRadius = nav.radius;
   return (
-    <div onClick={onEdit} title="Click to edit navbar" className={`mb-4 rounded-xl overflow-hidden border border-dashed border-slate-300 cursor-pointer hover:border-primary transition-colors ${nav.shadow ? "shadow-lg" : ""}`}>
-      <div
-        className="flex items-center justify-between gap-4 px-5 py-3 flex-wrap"
-        style={nav.glass
-          ? { background: "rgba(255,255,255,0.35)", backdropFilter: "saturate(180%) blur(14px)", WebkitBackdropFilter: "saturate(180%) blur(14px)", borderBottom: "1px solid rgba(255,255,255,0.25)", color: nav.color || "#0f172a" }
-          : { background: nav.bg || "#ffffff", color: nav.color || "#0f172a" }}
-      >
-        <span className="font-bold text-lg flex items-center gap-2">
-          {nav.brandImg ? <img src={nav.brandImg} alt="" className="h-7" /> : (nav.brand || "Brand")}
-        </span>
-        <div className="flex items-center gap-5 text-sm font-medium flex-wrap">
-          {nav.links.length
-            ? nav.links.map((l) => <span key={l.id} className="opacity-85">{l.label || "Link"}</span>)
-            : <span className="opacity-50 italic text-xs">No links yet</span>}
+    <div
+      onClick={onEdit}
+      title="Click to edit navbar"
+      className={`overflow-hidden border border-dashed border-slate-300 cursor-pointer hover:border-primary transition-colors ${nav.shadow ? "shadow-lg" : ""}`}
+      style={{
+        borderRadius: nav.radius ?? 12,
+        marginTop: nav.mt ?? 0,
+        marginBottom: nav.mb ?? 16,
+        ...(nav.widthPct ? { maxWidth: `${nav.widthPct}%` } : {}),
+        marginLeft: nav.ml != null ? nav.ml : (nav.widthPct ? "auto" : undefined),
+        marginRight: nav.mr != null ? nav.mr : (nav.widthPct ? "auto" : undefined),
+      }}
+    >
+      <div className="flex items-center justify-between gap-4 px-5 py-3 flex-wrap" style={barStyle}>
+        <div className={`flex items-center justify-between gap-4 flex-wrap w-full ${nav.full || nav.widthPct ? "" : "max-w-[1100px] mx-auto"}`}>
+          <span className="font-bold text-lg flex items-center gap-2">
+            {nav.brandImg ? <img src={nav.brandImg} alt="" className="h-7" /> : (nav.brand || "Brand")}
+          </span>
+          <div className="flex items-center gap-5 text-sm font-medium flex-wrap">
+            {nav.links.length
+              ? nav.links.map((l) => <span key={l.id} className="opacity-85">{l.label || "Link"}</span>)
+              : <span className="opacity-50 italic text-xs">No links yet</span>}
+          </div>
         </div>
       </div>
     </div>
@@ -1142,6 +1511,13 @@ function BuilderPalette({ onAddSection, onAddElement, onAddPreset, onEffect, onG
     ["carousel", GalleryHorizontal, "Carousel slider"],
     ["image-text", Columns, "Image + text"],
   ];
+  const templates: [PresetKind, any, string][] = [
+    ["cards-image-3", LayoutGrid, "3 image cards"],
+    ["cards-text-3", LayoutGrid, "3 text cards"],
+    ["pricing-3", CreditCard, "Pricing (3 tiers)"],
+    ["testimonials-3", Quote, "Testimonials"],
+    ["cta", Megaphone, "Call to action"],
+  ];
   const effects: { label: string; icon: any; patch?: Partial<Section>; nav?: boolean }[] = [
     { label: "Glassmorphism", icon: Sparkles, patch: { glass: true } },
     { label: "Gradient", icon: Palette, patch: { bg: "linear-gradient(135deg,#6366f1,#ec4899)" } },
@@ -1170,6 +1546,10 @@ function BuilderPalette({ onAddSection, onAddElement, onAddPreset, onEffect, onG
       <div className="space-y-0.5">
         {presets.map(([k, Icon, label]) => item(Icon, label, () => onAddPreset(k), k))}
       </div>
+      {heading("Card templates")}
+      <div className="space-y-0.5">
+        {templates.map(([k, Icon, label]) => item(Icon, label, () => onAddPreset(k), k))}
+      </div>
       {heading("Effects")}
       <div className="space-y-0.5">
         {effects.map((e) => item(e.icon, e.label, () => (e.nav ? onGlassNav() : onEffect(e.patch || {})), e.label))}
@@ -1181,12 +1561,28 @@ function BuilderPalette({ onAddSection, onAddElement, onAddPreset, onEffect, onG
 
 // ── Live preview of the footer in the canvas (click to edit) ──────────────────
 function FooterPreview({ footer, onEdit }: { footer: FooterConfig; onEdit: () => void }) {
+  const barStyle: React.CSSProperties = { background: footer.bg || "#0f172a", color: footer.color || "#e2e8f0" };
+  if (footer.minH) barStyle.minHeight = footer.minH;
   return (
-    <div onClick={onEdit} title="Click to edit footer" className="mt-4 rounded-xl overflow-hidden border border-dashed border-slate-300 cursor-pointer hover:border-primary transition-colors">
-      <div className="flex items-center justify-between gap-4 px-5 py-5 flex-wrap" style={{ background: footer.bg || "#0f172a", color: footer.color || "#e2e8f0" }}>
-        <span className="text-sm opacity-80">{footer.text || "© Your Company"}</span>
-        <div className="flex items-center gap-5 text-sm font-medium flex-wrap">
-          {footer.links.map((l) => <span key={l.id} className="opacity-85">{l.label || "Link"}</span>)}
+    <div
+      onClick={onEdit}
+      title="Click to edit footer"
+      className="overflow-hidden border border-dashed border-slate-300 cursor-pointer hover:border-primary transition-colors"
+      style={{
+        borderRadius: footer.radius ?? 12,
+        marginTop: footer.mt ?? 16,
+        marginBottom: footer.mb ?? 0,
+        ...(footer.widthPct ? { maxWidth: `${footer.widthPct}%` } : {}),
+        marginLeft: footer.ml != null ? footer.ml : (footer.widthPct ? "auto" : undefined),
+        marginRight: footer.mr != null ? footer.mr : (footer.widthPct ? "auto" : undefined),
+      }}
+    >
+      <div className="flex items-center justify-between gap-4 px-5 py-5 flex-wrap" style={barStyle}>
+        <div className={`flex items-center justify-between gap-4 flex-wrap w-full ${footer.full || footer.widthPct ? "" : "max-w-[1100px] mx-auto"}`}>
+          <span className="text-sm opacity-80">{footer.text || "© Your Company"}</span>
+          <div className="flex items-center gap-5 text-sm font-medium flex-wrap">
+            {footer.links.map((l) => <span key={l.id} className="opacity-85">{l.label || "Link"}</span>)}
+          </div>
         </div>
       </div>
     </div>
