@@ -66,7 +66,13 @@ interface Page {
   filename: string;
   title: string;
   contentMap: ContentItem[];
-  forms?: { key: string; label: string; fields: string[]; likelyContact: boolean; connected: boolean }[];
+  forms?: {
+    key: string;
+    label: string;
+    fields: string[];
+    likelyContact: boolean;
+    connected: boolean;
+  }[];
   layout?: any[];
 }
 
@@ -137,11 +143,14 @@ export default function SiteAdmin() {
     activeSectionRef.current = section;
     if (section === "support") setUnreadSupportCount(0);
     window.scrollTo({ top: 0, behavior: "smooth" });
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.set("tab", section);
-      return next;
-    }, { replace: true });
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("tab", section);
+        return next;
+      },
+      { replace: true },
+    );
   };
   const [showTopBtn, setShowTopBtn] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -191,13 +200,16 @@ export default function SiteAdmin() {
 
   // Find this site's active support request (if any) so we can listen for
   // expert replies even while the customer is on a different tab.
-  const [activeSupportRequestId, setActiveSupportRequestId] = useState<string | null>(null);
+  const [activeSupportRequestId, setActiveSupportRequestId] = useState<
+    string | null
+  >(null);
   useEffect(() => {
     if (!siteId) return;
     getMyRequestsAPI()
       .then((res) => {
         const active = res.data.data.requests.find(
-          (r: any) => r.siteId === siteId && ["pending", "accepted"].includes(r.status),
+          (r: any) =>
+            r.siteId === siteId && ["pending", "accepted"].includes(r.status),
         );
         setActiveSupportRequestId(active?._id || null);
       })
@@ -212,7 +224,10 @@ export default function SiteAdmin() {
     socket.on("connect", joinRoom);
 
     const onMessage = (msg: any) => {
-      if (msg.senderId?._id !== user?.id && activeSectionRef.current !== "support") {
+      if (
+        msg.senderId?._id !== user?.id &&
+        activeSectionRef.current !== "support"
+      ) {
         setUnreadSupportCount((c) => c + 1);
       }
     };
@@ -355,7 +370,10 @@ export default function SiteAdmin() {
       setUpgradeModalOpen(false);
       toast.success("Site upgraded to PRO!");
     } catch (err: any) {
-      toast.error(err.response?.data?.message || "Upgrade succeeded but refresh failed — reload the page");
+      toast.error(
+        err.response?.data?.message ||
+          "Upgrade succeeded but refresh failed — reload the page",
+      );
     } finally {
       setUpgrading(false);
     }
@@ -425,7 +443,14 @@ export default function SiteAdmin() {
     const page = site.pages[activePage];
     if (!page) return;
     try {
-      const res = await addElementAPI(siteId, page.filename, afterKey, type, value, href);
+      const res = await addElementAPI(
+        siteId,
+        page.filename,
+        afterKey,
+        type,
+        value,
+        href,
+      );
       setSite(res.data.data.site);
       toast.success("Element added and deployed");
     } catch (err: any) {
@@ -577,7 +602,10 @@ export default function SiteAdmin() {
                     title="PRO site — unlimited upload size"
                     className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-700 border border-amber-300"
                   >
-                    <Crown size={11} className="fill-amber-500 text-amber-500" />{" "}
+                    <Crown
+                      size={11}
+                      className="fill-amber-500 text-amber-500"
+                    />{" "}
                     PRO
                   </span>
                 )}
@@ -663,11 +691,16 @@ export default function SiteAdmin() {
                           )}
                           {item.id === "support" && unreadSupportCount > 0 && (
                             <span className="ml-auto min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-primary text-white text-[10px] font-semibold rounded-full">
-                              {unreadSupportCount > 9 ? "9+" : unreadSupportCount}
+                              {unreadSupportCount > 9
+                                ? "9+"
+                                : unreadSupportCount}
                             </span>
                           )}
                           {item.id === "domain" && site.plan !== "paid" && (
-                            <Lock size={11} className="text-amber-400 ml-auto" />
+                            <Lock
+                              size={11}
+                              className="text-amber-400 ml-auto"
+                            />
                           )}
                         </button>
                       );
@@ -762,7 +795,9 @@ export default function SiteAdmin() {
                       <div className="flex items-center gap-2 shrink-0">
                         <button
                           onClick={() => {
-                            navigator.clipboard.writeText(publicSiteUrl(site.slug));
+                            navigator.clipboard.writeText(
+                              publicSiteUrl(site.slug),
+                            );
                             toast.success("Link copied");
                           }}
                           className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-primary border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-white transition-colors"
@@ -782,8 +817,8 @@ export default function SiteAdmin() {
               )}
 
               {/* Custom Domain */}
-              {activeSection === "domain" && (
-                site.plan !== "paid" ? (
+              {activeSection === "domain" &&
+                (site.plan !== "paid" ? (
                   <ProLockedGate
                     title="Custom Domain — PRO Feature"
                     description="Connect your own domain with free automatic SSL. Upgrade this site to PRO to unlock it, along with expert support and unlimited upload size."
@@ -791,99 +826,100 @@ export default function SiteAdmin() {
                     upgrading={upgrading}
                   />
                 ) : (
-                <div className="p-5 bg-slate-50 rounded-xl border border-slate-200">
-                  <h2 className="font-bebas text-2xl text-slate-900 mb-1">
-                    Custom Domain
-                  </h2>
-                  <p className="text-xs text-slate-500 mb-4">
-                    Connect your own domain to this site.
-                  </p>
+                  <div className="p-5 bg-slate-50 rounded-xl border border-slate-200">
+                    <h2 className="font-bebas text-2xl text-slate-900 mb-1">
+                      Custom Domain
+                    </h2>
+                    <p className="text-xs text-slate-500 mb-4">
+                      Connect your own domain to this site.
+                    </p>
 
-                  {site.customDomain ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <a
-                          href={`https://${site.customDomain}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm font-mono text-green-600 truncate hover:underline"
-                        >
-                          https://{site.customDomain}
-                        </a>
-                        <button
-                          onClick={handleDomainRemove}
-                          disabled={domainRemoving}
-                          className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-700 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors shrink-0 disabled:opacity-50"
-                        >
-                          <X size={11} />{" "}
-                          {domainRemoving ? "Removing..." : "Remove"}
-                        </button>
-                      </div>
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800 space-y-1.5">
-                        <p className="font-semibold">DNS setup required</p>
-                        <p>Add this A record at your domain registrar:</p>
-                        <div className="font-mono bg-white border border-blue-200 rounded px-2 py-1.5 text-blue-900 space-y-1">
-                          <div className="flex gap-4">
-                            <span className="text-slate-400 w-16">Type</span>
-                            <span>A</span>
-                          </div>
-                          <div className="flex gap-4">
-                            <span className="text-slate-400 w-16">Name</span>
-                            <span>@</span>
-                          </div>
-                          <div className="flex gap-4">
-                            <span className="text-slate-400 w-16">Value</span>
-                            <span className="text-primary">137.184.18.70</span>
-                          </div>
-                          <div className="flex gap-4">
-                            <span className="text-slate-400 w-16">TTL</span>
-                            <span>3600</span>
-                          </div>
+                    {site.customDomain ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <a
+                            href={`https://${site.customDomain}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm font-mono text-green-600 truncate hover:underline"
+                          >
+                            https://{site.customDomain}
+                          </a>
+                          <button
+                            onClick={handleDomainRemove}
+                            disabled={domainRemoving}
+                            className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-700 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors shrink-0 disabled:opacity-50"
+                          >
+                            <X size={11} />{" "}
+                            {domainRemoving ? "Removing..." : "Remove"}
+                          </button>
                         </div>
-                        <p className="text-blue-600">
-                          DNS changes can take a few minutes to a few hours to
-                          propagate. HTTPS is issued automatically once your
-                          domain resolves here — no extra setup needed.
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800 space-y-1.5">
+                          <p className="font-semibold">DNS setup required</p>
+                          <p>Add this A record at your domain registrar:</p>
+                          <div className="font-mono bg-white border border-blue-200 rounded px-2 py-1.5 text-blue-900 space-y-1">
+                            <div className="flex gap-4">
+                              <span className="text-slate-400 w-16">Type</span>
+                              <span>A</span>
+                            </div>
+                            <div className="flex gap-4">
+                              <span className="text-slate-400 w-16">Name</span>
+                              <span>@</span>
+                            </div>
+                            <div className="flex gap-4">
+                              <span className="text-slate-400 w-16">Value</span>
+                              <span className="text-primary">
+                                137.184.18.70
+                              </span>
+                            </div>
+                            <div className="flex gap-4">
+                              <span className="text-slate-400 w-16">TTL</span>
+                              <span>3600</span>
+                            </div>
+                          </div>
+                          <p className="text-blue-600">
+                            DNS changes can take a few minutes to a few hours to
+                            propagate. HTTPS is issued automatically once your
+                            domain resolves here — no extra setup needed.
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden bg-white focus-within:ring-2 focus-within:ring-primary">
+                          <span className="bg-slate-50 text-slate-400 text-sm px-3 py-2 border-r border-slate-200 whitespace-nowrap shrink-0">
+                            http://
+                          </span>
+                          <input
+                            value={domainValue}
+                            onChange={(e) =>
+                              setDomainValue(
+                                e.target.value
+                                  .toLowerCase()
+                                  .replace(/^https?:\/\//, ""),
+                              )
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleDomainSave();
+                            }}
+                            placeholder="yourdomain.com"
+                            className="flex-1 px-3 py-2 text-sm focus:outline-none bg-white font-mono"
+                          />
+                          <button
+                            onClick={handleDomainSave}
+                            disabled={domainSaving || !domainValue.trim()}
+                            className="px-3 py-2 text-green-600 hover:text-green-700 disabled:opacity-40 border-l border-slate-200"
+                          >
+                            <Check size={15} />
+                          </button>
+                        </div>
+                        <p className="text-xs text-slate-400">
+                          Enter your domain (e.g. mysite.com or blog.mysite.com)
                         </p>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden bg-white focus-within:ring-2 focus-within:ring-primary">
-                        <span className="bg-slate-50 text-slate-400 text-sm px-3 py-2 border-r border-slate-200 whitespace-nowrap shrink-0">
-                          http://
-                        </span>
-                        <input
-                          value={domainValue}
-                          onChange={(e) =>
-                            setDomainValue(
-                              e.target.value
-                                .toLowerCase()
-                                .replace(/^https?:\/\//, ""),
-                            )
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") handleDomainSave();
-                          }}
-                          placeholder="yourdomain.com"
-                          className="flex-1 px-3 py-2 text-sm focus:outline-none bg-white font-mono"
-                        />
-                        <button
-                          onClick={handleDomainSave}
-                          disabled={domainSaving || !domainValue.trim()}
-                          className="px-3 py-2 text-green-600 hover:text-green-700 disabled:opacity-40 border-l border-slate-200"
-                        >
-                          <Check size={15} />
-                        </button>
-                      </div>
-                      <p className="text-xs text-slate-400">
-                        Enter your domain (e.g. mysite.com or blog.mysite.com)
-                      </p>
-                    </div>
-                  )}
-                </div>
-                )
-              )}
+                    )}
+                  </div>
+                ))}
 
               {/* Update Files */}
               {activeSection === "files" && (
@@ -1059,10 +1095,10 @@ export default function SiteAdmin() {
                         No editable content found
                       </p>
                       <p className="text-slate-400 text-sm mt-1 max-w-md mx-auto">
-                        JS-rendered apps (React, Vue, etc.) build their pages
-                        at runtime, so their content can't be edited here.
-                        Hosting, custom domains, SEO, and analytics still work
-                        — update content by redeploying a new build.
+                        JS-rendered apps (React, Vue, etc.) build their pages at
+                        runtime, so their content can't be edited here. Hosting,
+                        custom domains, SEO, and analytics still work — update
+                        content by redeploying a new build.
                       </p>
                     </div>
                   ) : (
@@ -1090,7 +1126,9 @@ export default function SiteAdmin() {
                   <div className="mb-5 flex items-center justify-between gap-3 flex-wrap p-4 rounded-xl border border-primary/20 bg-primary-light/40">
                     <div className="flex items-center gap-2 text-sm text-slate-600">
                       <LayoutTemplate size={16} className="text-primary" />
-                      Design this page visually with the full-screen builder — a left palette of elements &amp; banners, drag-and-drop canvas, and modern effects.
+                      Design this page visually with the full-screen builder — a
+                      left palette of elements &amp; banners, drag-and-drop
+                      canvas, and modern effects.
                     </div>
                     <Link
                       to={`/sites/${siteId}/builder?page=${encodeURIComponent(currentPage.filename)}`}
@@ -1099,7 +1137,7 @@ export default function SiteAdmin() {
                       <LayoutTemplate size={14} /> Open full-screen builder
                     </Link>
                   </div>
-                  <LayoutBuilder
+                  {/* <LayoutBuilder
                     key={currentPage.filename}
                     siteId={siteId}
                     page={currentPage.filename}
@@ -1108,15 +1146,19 @@ export default function SiteAdmin() {
                     initialNav={(currentPage as any).nav}
                     initialFooter={(currentPage as any).footer}
                     onSaved={(updatedSite) => setSite(updatedSite)}
-                  />
+                  /> */}
                 </div>
               )}
 
               {/* Form submissions */}
               {activeSection === "submissions" && siteId && currentPage && (
                 <div>
-                  <h2 className="font-bebas text-2xl text-slate-900 mb-1">Form Submissions</h2>
-                  <p className="text-xs text-slate-500 mb-4">Messages sent through your site's contact form.</p>
+                  <h2 className="font-bebas text-2xl text-slate-900 mb-1">
+                    Form Submissions
+                  </h2>
+                  <p className="text-xs text-slate-500 mb-4">
+                    Messages sent through your site's contact form.
+                  </p>
                   <Submissions
                     siteId={siteId}
                     page={currentPage.filename}
@@ -1132,14 +1174,17 @@ export default function SiteAdmin() {
                 siteId &&
                 (isJSRenderedApp ? (
                   <div className="text-center py-16 border-2 border-dashed border-slate-200 rounded-2xl">
-                    <Palette size={40} className="text-slate-300 mx-auto mb-3" />
+                    <Palette
+                      size={40}
+                      className="text-slate-300 mx-auto mb-3"
+                    />
                     <p className="text-slate-600 font-medium">
                       Color editing not available
                     </p>
                     <p className="text-slate-400 text-sm mt-1 max-w-md mx-auto">
-                      JS-rendered apps (React, Vue, etc.) bundle their styles
-                      at build time, so colors can't be edited here. Update
-                      your theme in code and redeploy a new build.
+                      JS-rendered apps (React, Vue, etc.) bundle their styles at
+                      build time, so colors can't be edited here. Update your
+                      theme in code and redeploy a new build.
                     </p>
                   </div>
                 ) : (
@@ -1153,7 +1198,11 @@ export default function SiteAdmin() {
               {/* SEO — audit + one-click fixes, then manual fine-tuning */}
               {activeSection === "seo" && site && (
                 <div className="space-y-10">
-                  <SiteSeoChecker siteId={site.siteId} pages={site.pages} onSiteUpdated={setSite} />
+                  <SiteSeoChecker
+                    siteId={site.siteId}
+                    pages={site.pages}
+                    onSiteUpdated={setSite}
+                  />
 
                   <div className="border-t border-slate-200 pt-8">
                     <FaviconEditor
@@ -1167,7 +1216,10 @@ export default function SiteAdmin() {
                       siteSlug={site.slug}
                       pages={site.pages}
                       onSaveSuccess={(updatedPages) => {
-                        setSite((prev: any) => ({ ...prev, pages: updatedPages }));
+                        setSite((prev: any) => ({
+                          ...prev,
+                          pages: updatedPages,
+                        }));
                       }}
                     />
                   </div>
