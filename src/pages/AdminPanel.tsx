@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
-import { BarChart2, Users, Globe, CheckCircle2, Eye, Trash2, Headset, Crown, Receipt, MessageSquare, X } from 'lucide-react';
+import { BarChart2, Users, Globe, CheckCircle2, Eye, Trash2, Headset, Crown, Receipt, MessageSquare, X, ExternalLink } from 'lucide-react';
+import { publicSiteUrl } from '../lib/siteUrl';
 import {
   getStatsAPI, getAllUsersAPI, getAllSitesAdminAPI,
   updateUserStatusAPI, updateUserRoleAPI, adminDeleteSiteAPI,
@@ -175,7 +176,14 @@ export default function AdminPanel() {
                         <tr key={s.siteId} className="border-b border-slate-100 hover:bg-slate-50">
                           <td className="py-3 px-2">
                             <p className="font-medium">{s.name}</p>
-                            <p className="text-xs text-slate-400 font-mono">{s.siteId}</p>
+                            {(() => {
+                              const url = s.customDomain ? `https://${s.customDomain}` : publicSiteUrl(s.slug || s.siteId);
+                              return (
+                                <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary font-mono hover:underline break-all">
+                                  {url.replace(/^https?:\/\//, '')}
+                                </a>
+                              );
+                            })()}
                           </td>
                           <td className="py-3 px-2 text-slate-500">{s.userId?.email || '—'}</td>
                           <td className="py-3 px-2 text-slate-500">{s.pages?.length ?? 0}</td>
@@ -185,9 +193,19 @@ export default function AdminPanel() {
                           <td className="py-3 px-2 text-slate-500 flex items-center gap-1"><Eye size={12} />{s.visits}</td>
                           <td className="py-3 px-2 text-slate-500">{new Date(s.created_at).toLocaleDateString()}</td>
                           <td className="py-3 px-2">
-                            <button onClick={() => handleDeleteSite(s.siteId)} className="flex items-center gap-1 text-xs px-2.5 py-1 border border-red-100 text-red-500 rounded-lg hover:bg-red-50">
-                              <Trash2 size={11} /> Delete
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <a
+                                href={s.customDomain ? `https://${s.customDomain}` : publicSiteUrl(s.slug || s.siteId)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-xs px-2.5 py-1 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50"
+                              >
+                                <ExternalLink size={11} /> Visit
+                              </a>
+                              <button onClick={() => handleDeleteSite(s.siteId)} className="flex items-center gap-1 text-xs px-2.5 py-1 border border-red-100 text-red-500 rounded-lg hover:bg-red-50">
+                                <Trash2 size={11} /> Delete
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}

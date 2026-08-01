@@ -15,7 +15,6 @@ import {
   Inbox,
   LayoutTemplate,
   Link2,
-  Lock,
   Palette,
   Pencil,
   Rocket,
@@ -695,12 +694,6 @@ export default function SiteAdmin() {
                                 : unreadSupportCount}
                             </span>
                           )}
-                          {item.id === "domain" && site.plan !== "paid" && (
-                            <Lock
-                              size={11}
-                              className="text-amber-400 ml-auto"
-                            />
-                          )}
                         </button>
                       );
                     })}
@@ -815,16 +808,8 @@ export default function SiteAdmin() {
                 </div>
               )}
 
-              {/* Custom Domain */}
-              {activeSection === "domain" &&
-                (site.plan !== "paid" ? (
-                  <ProLockedGate
-                    title="Custom Domain — PRO Feature"
-                    description="Connect your own domain with free automatic SSL. Upgrade this site to PRO to unlock it, along with expert support and unlimited upload size."
-                    onUpgradeClick={handleUpgradeClick}
-                    upgrading={upgrading}
-                  />
-                ) : (
+              {/* Custom Domain — free for all sites */}
+              {activeSection === "domain" && (
                   <div className="p-5 bg-slate-50 rounded-xl border border-slate-200">
                     <h2 className="font-bebas text-2xl text-slate-900 mb-1">
                       Custom Domain
@@ -918,7 +903,7 @@ export default function SiteAdmin() {
                       </div>
                     )}
                   </div>
-                ))}
+                )}
 
               {/* Update Files */}
               {activeSection === "files" && (
@@ -1045,7 +1030,7 @@ export default function SiteAdmin() {
                   {site.plan !== "paid" ? (
                     <ProLockedGate
                       title="Attach Source Code — PRO Feature"
-                      description="Let experts receive your real project source (not just build output) when you request support. Upgrade this site to PRO to unlock it, along with a custom domain and unlimited upload size."
+                      description="Let experts receive your real project source (not just build output) when you request support. Upgrade this site to PRO to unlock it, along with unlimited upload size."
                       onUpgradeClick={handleUpgradeClick}
                       upgrading={upgrading}
                     />
