@@ -1,58 +1,57 @@
-import { useEffect, useRef, useState } from "react";
-import { useParams, useSearchParams, Link } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
-import { toast } from "react-toastify";
+import { AnimatePresence, motion } from "framer-motion";
 import {
-  ExternalLink,
-  ChevronRight,
-  Eye,
-  Rocket,
-  X,
-  FileCode,
-  Link2,
-  Check,
-  Pencil,
-  UploadCloud,
   Archive,
-  FileText,
-  BarChart3,
-  Globe,
   ArrowUp,
-  Palette,
+  BarChart3,
+  Check,
+  ChevronRight,
   Crown,
+  ExternalLink,
+  Eye,
+  FileCode,
+  FileText,
+  Globe,
   Headset,
-  Lock,
-  LayoutTemplate,
   Inbox,
+  LayoutTemplate,
+  Link2,
+  Lock,
+  Palette,
+  Pencil,
+  Rocket,
+  UploadCloud,
+  X,
 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
+import { toast } from "react-toastify";
+import { getPaymentInfoAPI } from "../api/payment.api";
 import {
-  getSiteAPI,
-  updateContentAPI,
-  updateSlugAPI,
-  redeployZipAPI,
-  redeployFilesAPI,
-  setCustomDomainAPI,
-  removeCustomDomainAPI,
-  updateElementsAPI,
   addElementAPI,
+  getSiteAPI,
+  redeployFilesAPI,
+  redeployZipAPI,
+  removeCustomDomainAPI,
+  setCustomDomainAPI,
+  updateContentAPI,
+  updateElementsAPI,
+  updateSlugAPI,
 } from "../api/site.api";
-import ContentEditor from "../components/ContentEditor";
-import LayoutBuilder from "../components/LayoutBuilder";
-import Submissions from "../components/Submissions";
+import { getMyRequestsAPI } from "../api/support.api";
 import AnalyticsChart from "../components/AnalyticsChart";
-import SEOEditor from "../components/SEOEditor";
-import SiteSeoChecker from "../components/SiteSeoChecker";
 import ColorEditor from "../components/ColorEditor";
+import ContentEditor from "../components/ContentEditor";
 import FaviconEditor from "../components/FaviconEditor";
 import PaymentModal from "../components/PaymentModal";
-import SupportSection from "../components/SupportSection";
-import SourceArchiveControl from "../components/SourceArchiveControl";
 import ProLockedGate from "../components/ProLockedGate";
-import { getPaymentInfoAPI } from "../api/payment.api";
-import { getMyRequestsAPI } from "../api/support.api";
+import SEOEditor from "../components/SEOEditor";
+import SiteSeoChecker from "../components/SiteSeoChecker";
+import SourceArchiveControl from "../components/SourceArchiveControl";
+import Submissions from "../components/Submissions";
+import SupportSection from "../components/SupportSection";
+import { APP_DOMAIN, publicSiteUrl } from "../lib/siteUrl";
 import { getSocket } from "../lib/socket";
 import { AuthStore } from "../store/auth";
-import { publicSiteUrl, APP_DOMAIN } from "../lib/siteUrl";
 
 const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
