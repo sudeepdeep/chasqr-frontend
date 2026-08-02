@@ -20,14 +20,14 @@ function serializeStyle(o: Record<string, string>): string {
     .join("; ");
 }
 
-const FONT_SIZES: { label: string; value: string }[] = [
-  { label: "Default", value: "" },
-  { label: "Small", value: "0.875rem" },
-  { label: "Normal", value: "1rem" },
-  { label: "Large", value: "1.5rem" },
-  { label: "X-Large", value: "2rem" },
-  { label: "Huge", value: "3rem" },
-];
+/** Parse any CSS font-size value into pixels (integer). Returns null if unset. */
+function parseFontSizePx(v: string): number | null {
+  if (!v) return null;
+  if (v.endsWith("px")) return Math.round(parseFloat(v));
+  if (v.endsWith("rem")) return Math.round(parseFloat(v) * 16);
+  if (v.endsWith("em")) return Math.round(parseFloat(v) * 16);
+  return null;
+}
 
 interface Props {
   /** Current inline style string (edits[key::style] ?? item.style). */
@@ -101,16 +101,43 @@ export default function StyleToolbar({ style, onChange }: Props) {
 
       <span className="w-px h-5 bg-slate-200 mx-0.5" />
 
-      <select
-        value={st["font-size"] || ""}
-        onChange={(e) => setProp("font-size", e.target.value || null)}
-        title="Font size"
-        className="text-xs text-slate-600 bg-transparent border border-slate-200 rounded-md px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-      >
-        {FONT_SIZES.map((f) => (
-          <option key={f.label} value={f.value}>{f.label}</option>
-        ))}
-      </select>
+      {/* Font size +/- controls */}
+      {(() => {
+        const sizePx = parseFontSizePx(st["font-size"] || "");
+        const displayPx = sizePx ?? 16;
+        const change = (delta: number) => {
+          const next = Math.min(120, Math.max(8, displayPx + delta));
+          setProp("font-size", `${next}px`);
+        };
+        return (
+          <div className="flex items-center gap-0.5" title="Font size">
+            <button
+              type="button"
+              onClick={() => change(-1)}
+              title="Decrease font size"
+              className="w-6 h-7 flex items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 transition-colors text-base leading-none select-none"
+            >
+              −
+            </button>
+            <button
+              type="button"
+              onClick={() => sizePx !== null && setProp("font-size", null)}
+              title={sizePx !== null ? "Click to reset to default" : "Font size (default)"}
+              className="h-7 px-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-md transition-colors min-w-[3rem] text-center tabular-nums"
+            >
+              {sizePx !== null ? `${displayPx}px` : "Default"}
+            </button>
+            <button
+              type="button"
+              onClick={() => change(+1)}
+              title="Increase font size"
+              className="w-6 h-7 flex items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 transition-colors text-base leading-none select-none"
+            >
+              +
+            </button>
+          </div>
+        );
+      })()}
     </div>
   );
 }
