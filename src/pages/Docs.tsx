@@ -1,53 +1,68 @@
 import { motion } from "framer-motion";
 import {
+  AlertTriangle,
   BarChart3,
   CheckCircle2,
   Clock,
-  Eye,
+  CreditCard,
   FileCode,
-  FolderArchive,
   Globe,
   Headset,
+  Info,
   Layers,
   LayoutTemplate,
-  Lock,
+  Lightbulb,
+  Link2,
+  LifeBuoy,
   Mail,
+  MessageCircle,
+  Palette,
   Paintbrush,
+  Pencil,
   Rocket,
+  Search,
   Settings,
+  UploadCloud,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 const API_URL = process.env.REACT_APP_API_URL || "https://api.chasqr.com";
+const APP_DOMAIN = process.env.REACT_APP_APP_DOMAIN || "chasqr.com";
+// Mirrors the A record shown in a site's Custom Domain tab.
+const SITE_IP = "137.184.18.70";
 
 const SUPPORTED = [
   {
     name: "Plain HTML / CSS / JS",
     detail: "Any static website — no build step needed.",
-    requirement: "index.html at the root of your ZIP",
+    requirement: "Zip your files with index.html at the root",
   },
   {
-    name: "React",
-    detail: "Create React App or Vite projects.",
-    requirement:
-      "Run npm run build, zip the contents of the build/ or dist/ folder",
+    name: "React (Create React App)",
+    detail: "Classic CRA projects.",
+    requirement: "npm run build → zip the contents of build/",
   },
   {
-    name: "Vue",
-    detail: "Vue 3 / Vite projects.",
-    requirement: "Run npm run build, zip the contents of the dist/ folder",
+    name: "React / Vue / Svelte (Vite)",
+    detail: "Vite-powered projects of any flavour.",
+    requirement: "npm run build → zip the contents of dist/",
   },
   {
     name: "Angular",
     detail: "Angular CLI projects.",
-    requirement: "Run ng build, zip the contents of dist/<project-name>/",
+    requirement:
+      "ng build → zip the contents of dist/<project>/ (or dist/<project>/browser on v17+)",
   },
   {
-    name: "Svelte / SvelteKit (static)",
-    detail: "Static-adapter builds.",
-    requirement:
-      "Run npm run build, zip the contents of the build/ or dist/ folder",
+    name: "Next.js (static export only)",
+    detail: "Requires output: 'export' — SSR and API routes are not supported.",
+    requirement: "next build → zip the contents of out/",
+  },
+  {
+    name: "Astro, Hugo, Jekyll, Eleventy…",
+    detail: "Any static site generator works the same way.",
+    requirement: "Run its build → zip the contents of the output folder",
   },
 ];
 
@@ -58,46 +73,389 @@ const UPCOMING = [
   "Ruby on Rails",
 ];
 
-const SECTIONS = [
-  { id: "getting-started", label: "Getting Started", icon: Rocket },
-  { id: "visual-builder", label: "Visual Builder Setup", icon: Paintbrush },
+const PALETTE_GROUPS = [
   {
-    id: "builder-detailed",
-    label: "Using the Visual Editor",
-    icon: LayoutTemplate,
+    title: "Elements",
+    items:
+      "Heading, Text, Image, Button, Form, Embed, Carousel, Tags / pills, Tabs, Navbar, Search bar, Marquee",
+    note: "Dropped into the column you currently have selected.",
   },
-  { id: "editor-sections", label: "Building Sections", icon: Settings },
-  { id: "manage-site", label: "Managing Your Site", icon: Settings },
-  { id: "custom-domains", label: "Custom Domains", icon: Globe },
-  { id: "analytics-forms", label: "Analytics & Forms", icon: BarChart3 },
-  { id: "seo", label: "SEO Optimization", icon: Eye },
-  { id: "how-to-deploy", label: "Deploy Existing Code", icon: Rocket },
-  { id: "supported-types", label: "Supported Project Types", icon: Layers },
-  { id: "file-requirements", label: "File Requirements", icon: FileCode },
-  { id: "contact-forms", label: "Connect a Contact Form", icon: Mail },
-  { id: "roadmap", label: "Roadmap", icon: Clock },
-  { id: "get-help", label: "Get Help", icon: Headset },
+  {
+    title: "Utilities (card parts)",
+    items: "Rating (stars), Price, Tags / pills, Button",
+    note: "Small pieces for composing your own cards.",
+  },
+  {
+    title: "Form templates",
+    items: "Split Form, Agency Form, Survey Step Form",
+    note: "Ready-made contact forms, already wired to your Submissions tab.",
+  },
+  {
+    title: "Banners & sections",
+    items:
+      "Navbar, Navbar + search, Text over image, Image banner, Carousel slider, Image + text, Footer (4 columns), Footer (simple)",
+    note: "Each one adds a whole new section to the page.",
+  },
+  {
+    title: "Card templates",
+    items:
+      "Showcase card, Image overlay cards, Hover reveal cards, Multi-image carousel, Product-card carousel, Image-top cards, Profile cards, Text cards, Pricing (3 tiers), Testimonials, Call to action",
+    note: "Complete, styled sections you can edit block by block.",
+  },
+  {
+    title: "Effects",
+    items:
+      "Glassmorphism, Gradient, Soft shadow, Rounded, Hero height, Glass navbar",
+    note: "Applied to the selected (or most recent) section.",
+  },
 ];
 
+const ADMIN_TABS = [
+  {
+    group: "Settings",
+    rows: [
+      ["Site URL", "Change the free chasqr.com subdomain your site lives on."],
+      ["Custom Domain", "Connect a domain you own. Free on every site."],
+      [
+        "Update Files",
+        "Replace your site's files with a new build, keeping the same URL.",
+      ],
+    ],
+  },
+  {
+    group: "Content",
+    rows: [
+      ["Editor", "Edit the text, images and links on your live pages."],
+      ["Layout", "Open the full-screen visual builder for this page."],
+      ["Colors", "Recolour the site — every colour found in its styles."],
+      ["SEO", "Audit, auto-fix, favicon, and per-page meta tags."],
+      ["Analytics", "Visits over the last 30 days."],
+      ["Submissions", "Contact-form messages, and form connection settings."],
+    ],
+  },
+  {
+    group: "Help",
+    rows: [
+      ["Expert Help", "Chat with a verified expert about this specific site."],
+    ],
+  },
+];
+
+const TROUBLESHOOTING = [
+  {
+    q: '"No index.html found in zip"',
+    a: "Your ZIP has the project inside a folder. Open the build output folder, select everything inside it, and zip that — index.html must sit at the very top level of the archive.",
+  },
+  {
+    q: "Site is live but the styling and images are missing",
+    a: "You most likely uploaded your source folder instead of the build output. Run your framework's build command and upload the generated build/ or dist/ folder. If you wrote plain HTML, check that your CSS and image paths match the file names in the ZIP (they are case-sensitive).",
+  },
+  {
+    q: 'Editor says "No editable content found"',
+    a: "That site is served as a live JavaScript app (React, Vue, Angular built output, or you ticked the interactive option on upload). Its pages are built in the browser, so there is no HTML text for the panel to edit. Change the content in your code and redeploy from Update Files. Hosting, custom domains, SEO and analytics all still work.",
+  },
+  {
+    q: "Custom domain shows my registrar's parking page",
+    a: "An old A or CNAME record is still in place, or DNS has not refreshed yet. Delete any other record with the same name, keep only the A record pointing at Chasqr, and give it up to a few hours.",
+  },
+  {
+    q: '"404 — Site not found" on my custom domain',
+    a: "The domain reaches us, but no live site claims it. Check the spelling in the Custom Domain tab (including www), make sure it is saved on the right site, and make sure the site is not paused on your dashboard.",
+  },
+  {
+    q: "Browser warns the certificate is invalid",
+    a: "HTTPS is issued the first time your domain reaches us, so it only works once DNS has propagated and the domain is saved in Chasqr. Confirm both, then reload after a minute.",
+  },
+  {
+    q: "Upload is blocked by a payment prompt",
+    a: "The upload is over the 5 MB free limit. Either trim the build (large images and unused assets are the usual culprits) or make the one-time payment, which upgrades that site to PRO and removes the size limit for good.",
+  },
+  {
+    q: "Form submissions are not arriving",
+    a: "Open the Submissions tab and check the form shows as Connected. Every field also needs a name attribute, and the site must be live — a paused site rejects submissions.",
+  },
+];
+
+const SECTION_GROUPS: {
+  label: string;
+  items: { id: string; label: string; icon: any }[];
+}[] = [
+  {
+    label: "Start here",
+    items: [{ id: "getting-started", label: "Getting Started", icon: Rocket }],
+  },
+  {
+    label: "Build without code",
+    items: [
+      { id: "visual-builder", label: "Create a Site", icon: Paintbrush },
+      { id: "builder-guide", label: "Using the Builder", icon: LayoutTemplate },
+      { id: "builder-sections", label: "Sections & Cards", icon: Layers },
+    ],
+  },
+  {
+    label: "Deploy your code",
+    items: [
+      { id: "deploy-code", label: "Deploy Existing Code", icon: UploadCloud },
+      { id: "supported-types", label: "Supported Projects", icon: Layers },
+      { id: "file-requirements", label: "File Requirements", icon: FileCode },
+    ],
+  },
+  {
+    label: "Manage your site",
+    items: [
+      { id: "site-dashboard", label: "Site Dashboard", icon: Settings },
+      { id: "content-editor", label: "Edit Text & Images", icon: Pencil },
+      { id: "update-files", label: "Update Your Files", icon: UploadCloud },
+      { id: "colors", label: "Colors", icon: Palette },
+      { id: "site-url", label: "Site URL", icon: Link2 },
+      { id: "custom-domains", label: "Custom Domain", icon: Globe },
+    ],
+  },
+  {
+    label: "Grow your site",
+    items: [
+      { id: "seo", label: "SEO", icon: Search },
+      { id: "analytics", label: "Analytics", icon: BarChart3 },
+      { id: "contact-forms", label: "Contact Forms", icon: Mail },
+    ],
+  },
+  {
+    label: "Account & help",
+    items: [
+      { id: "pro-billing", label: "PRO & Billing", icon: CreditCard },
+      { id: "expert-help", label: "Expert Help", icon: Headset },
+      { id: "troubleshooting", label: "Troubleshooting", icon: LifeBuoy },
+      { id: "roadmap", label: "Coming Soon", icon: Clock },
+      { id: "get-help", label: "Still Stuck?", icon: MessageCircle },
+    ],
+  },
+];
+
+const ALL_SECTIONS = SECTION_GROUPS.flatMap((g) => g.items);
+
+/* ── Small building blocks ────────────────────────────────────────────────── */
+
+type Refs = React.MutableRefObject<Record<string, HTMLElement | null>>;
+
+function Sec({
+  id,
+  title,
+  intro,
+  refs,
+  children,
+}: {
+  id: string;
+  title: string;
+  intro?: React.ReactNode;
+  refs: Refs;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      id={id}
+      ref={(el) => {
+        refs.current[id] = el;
+      }}
+      className="mb-16 scroll-mt-28"
+    >
+      <h2 className="font-bebas text-3xl text-slate-900 mb-3">{title}</h2>
+      {intro && (
+        <p className="text-sm text-slate-600 leading-relaxed mb-6">{intro}</p>
+      )}
+      {children}
+    </section>
+  );
+}
+
+/** Numbered walkthrough. Children must be <Step> elements. */
+function Steps({ children }: { children: React.ReactNode }) {
+  const items = React.Children.toArray(children);
+  return (
+    <div>
+      {items.map((child, i) =>
+        React.isValidElement(child)
+          ? React.cloneElement(child as React.ReactElement<any>, {
+              n: i + 1,
+              last: i === items.length - 1,
+            })
+          : child,
+      )}
+    </div>
+  );
+}
+
+function Step({
+  n,
+  title,
+  last,
+  children,
+}: {
+  n?: number;
+  title: string;
+  last?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex gap-4">
+      <div className="flex flex-col items-center shrink-0">
+        <span className="w-8 h-8 rounded-full bg-primary text-white text-sm font-semibold flex items-center justify-center">
+          {n}
+        </span>
+        {!last && <span className="w-px flex-1 bg-slate-200 my-1.5" />}
+      </div>
+      <div className={`min-w-0 flex-1 ${last ? "pb-0" : "pb-7"}`}>
+        <h3 className="font-semibold text-slate-900 text-sm mb-1.5">{title}</h3>
+        <div className="text-sm text-slate-600 leading-relaxed space-y-2.5">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const NOTE_STYLES: Record<string, { box: string; icon: any; text: string }> = {
+  info: {
+    box: "border-primary/20 bg-primary-light/40",
+    icon: Info,
+    text: "text-primary",
+  },
+  tip: {
+    box: "border-green-200 bg-green-50/60",
+    icon: Lightbulb,
+    text: "text-green-600",
+  },
+  warn: {
+    box: "border-amber-200 bg-amber-50/60",
+    icon: AlertTriangle,
+    text: "text-amber-600",
+  },
+};
+
+function Note({
+  tone = "info",
+  title,
+  children,
+}: {
+  tone?: "info" | "tip" | "warn";
+  title?: string;
+  children: React.ReactNode;
+}) {
+  const s = NOTE_STYLES[tone];
+  const Icon = s.icon;
+  return (
+    <div className={`flex gap-3 rounded-xl border p-4 ${s.box}`}>
+      <Icon size={15} className={`shrink-0 mt-0.5 ${s.text}`} />
+      <div className="text-sm text-slate-700 leading-relaxed">
+        {title && (
+          <span className="font-semibold text-slate-900 block mb-0.5">
+            {title}
+          </span>
+        )}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** Screenshot with a caption. `n` is the doc-<n>.png in /public/images. */
+function Shot({ n, alt }: { n: number; alt: string }) {
+  return (
+    <figure className="my-1">
+      <img
+        src={`${process.env.PUBLIC_URL || ""}/images/doc-${n}.png`}
+        alt={alt}
+        loading="lazy"
+        className="w-full rounded-xl border border-slate-200 shadow-sm bg-white"
+      />
+      <figcaption className="text-xs text-slate-400 mt-2 leading-relaxed">
+        {alt}
+      </figcaption>
+    </figure>
+  );
+}
+
+function C({ children }: { children: React.ReactNode }) {
+  return (
+    <code className="font-mono text-[.8em] bg-slate-100 text-slate-700 border border-slate-200 rounded px-1.5 py-0.5">
+      {children}
+    </code>
+  );
+}
+
+function Code({ children }: { children: string }) {
+  return (
+    <pre className="text-[11px] leading-relaxed bg-slate-900 text-slate-100 rounded-xl p-4 overflow-x-auto">
+      <code>{children}</code>
+    </pre>
+  );
+}
+
+function Card({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="p-5 border border-slate-200 rounded-xl">
+      <h4 className="font-semibold text-slate-900 text-sm mb-2">{title}</h4>
+      <div className="text-sm text-slate-600 leading-relaxed space-y-2">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ── Page ─────────────────────────────────────────────────────────────────── */
+
 export default function Docs() {
-  const [activeId, setActiveId] = useState(SECTIONS[0].id);
+  const [activeId, setActiveId] = useState(ALL_SECTIONS[0].id);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
+  // Scroll-spy. An IntersectionObserver band leaves the last few (short)
+  // sections permanently unhighlighted once the page can't scroll any further,
+  // so the active item is derived from positions instead — and the bottom of
+  // the page always maps to the last section.
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.filter((e) => e.isIntersecting);
-        if (visible.length > 0) {
-          setActiveId(visible[0].target.id);
-        }
-      },
-      { rootMargin: "-15% 0px -70% 0px" },
-    );
+    const ids = ALL_SECTIONS.map((s) => s.id);
 
-    Object.values(sectionRefs.current).forEach(
-      (el) => el && observer.observe(el),
-    );
-    return () => observer.disconnect();
+    const compute = () => {
+      const doc = document.documentElement;
+      const atBottom =
+        window.scrollY + window.innerHeight >= doc.scrollHeight - 2;
+      if (atBottom) {
+        setActiveId(ids[ids.length - 1]);
+        return;
+      }
+      const line = 160; // just below the sticky navbar
+      let current = ids[0];
+      for (const id of ids) {
+        const el = sectionRefs.current[id];
+        if (!el) continue;
+        if (el.getBoundingClientRect().top <= line) current = id;
+        else break;
+      }
+      setActiveId(current);
+    };
+
+    let frame = 0;
+    const onScroll = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        compute();
+      });
+    };
+
+    compute();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
   }, []);
 
   useEffect(() => {
@@ -114,12 +472,15 @@ export default function Docs() {
     }
   }, []);
 
-  const scrollTo = (id: string) => {
+  const scrollTo = useCallback((id: string) => {
+    setActiveId(id);
     sectionRefs.current[id]?.scrollIntoView({
       behavior: "smooth",
       block: "start",
     });
-  };
+  }, []);
+
+  const refs = sectionRefs;
 
   return (
     <div className="min-h-screen bg-white pt-28 pb-20 px-6">
@@ -127,37 +488,45 @@ export default function Docs() {
         <h1 className="font-bebas text-5xl text-slate-900 mb-3">
           Documentation
         </h1>
-        <p className="text-slate-500 mb-10 leading-relaxed">
-          Complete guide to using Chasqr. Learn how to build websites visually
-          without code, or deploy your existing projects in minutes.
+        <p className="text-slate-500 mb-10 leading-relaxed max-w-2xl">
+          Everything Chasqr can do, step by step — building a site visually
+          without code, deploying a project you already have, and running it
+          once it's live.
         </p>
 
         <div className="flex gap-10 items-start">
           {/* Sidebar */}
-          <nav className="w-56 shrink-0 sticky top-28 hidden md:block">
-            <div className="space-y-0.5">
-              {SECTIONS.map((s) => {
-                const Icon = s.icon;
-                const active = activeId === s.id;
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => scrollTo(s.id)}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
-                      active
-                        ? "bg-primary-light text-primary"
-                        : "text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    <Icon
-                      size={15}
-                      className={active ? "text-primary" : "text-slate-400"}
-                    />
-                    {s.label}
-                  </button>
-                );
-              })}
-            </div>
+          <nav className="w-56 shrink-0 sticky top-28 hidden md:block max-h-[calc(100vh-9rem)] overflow-y-auto pb-6">
+            {SECTION_GROUPS.map((group) => (
+              <div key={group.label} className="mb-5">
+                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide px-3 mb-1.5">
+                  {group.label}
+                </p>
+                <div className="space-y-0.5">
+                  {group.items.map((s) => {
+                    const Icon = s.icon;
+                    const active = activeId === s.id;
+                    return (
+                      <button
+                        key={s.id}
+                        onClick={() => scrollTo(s.id)}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
+                          active
+                            ? "bg-primary-light text-primary"
+                            : "text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        <Icon
+                          size={15}
+                          className={active ? "text-primary" : "text-slate-400"}
+                        />
+                        {s.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </nav>
 
           {/* Mobile section selector */}
@@ -167,7 +536,7 @@ export default function Docs() {
               onChange={(e) => scrollTo(e.target.value)}
               className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-medium bg-white"
             >
-              {SECTIONS.map((s) => (
+              {ALL_SECTIONS.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.label}
                 </option>
@@ -181,1049 +550,394 @@ export default function Docs() {
             animate={{ opacity: 1, y: 0 }}
             className="flex-1 min-w-0 max-w-3xl"
           >
-            {/* Getting Started */}
-            <section
+            {/* ── Getting started ───────────────────────────────────────── */}
+            <Sec
               id="getting-started"
-              ref={(el) => {
-                sectionRefs.current["getting-started"] = el;
-              }}
-              className="mb-14 scroll-mt-28"
+              title="Getting Started"
+              refs={refs}
+              intro="Chasqr hosts websites and gives you a visual builder to make them. There are two ways in, and you can use both — one site built by hand, another deployed from code."
             >
-              <h2 className="font-bebas text-3xl text-slate-900 mb-5">
-                Getting Started with Chasqr
-              </h2>
-              <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-                Welcome to Chasqr! Whether you want to build a website visually
-                without coding, or deploy existing code, you're in the right
-                place. Here's what you need to know:
-              </p>
-
-              <div className="space-y-4 mb-8">
-                <div className="p-5 border-l-4 border-primary bg-primary-light/30 rounded-r-lg">
-                  <h4 className="font-semibold text-slate-900 text-sm mb-2">
-                    Two Ways to Build
+              <div className="grid sm:grid-cols-2 gap-4 mb-6">
+                <div className="p-5 border border-slate-200 rounded-xl">
+                  <span className="w-10 h-10 flex items-center justify-center rounded-xl bg-primary-light text-primary mb-3">
+                    <Paintbrush size={18} />
+                  </span>
+                  <h4 className="font-semibold text-slate-900 text-sm mb-1">
+                    Build from scratch
                   </h4>
-                  <p className="text-sm text-slate-700 leading-relaxed">
-                    <span className="font-medium">
-                      Option 1 - Visual Builder:
-                    </span>{" "}
-                    Create websites by dragging elements (text, images, buttons,
-                    sections) onto a canvas. No coding required. Perfect for
-                    portfolios, landing pages, and business sites.
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    Start with a blank page and drop in headings, images,
+                    buttons, forms, a navbar and a footer. No code at any point.
+                    Best for portfolios, landing pages and small business sites.
                   </p>
-                  <p className="text-sm text-slate-700 leading-relaxed mt-2">
-                    <span className="font-medium">Option 2 - Deploy Code:</span>{" "}
-                    Have existing HTML, React, Vue, or Angular code? Upload it
-                    as a ZIP file and go live instantly. Full control over your
-                    code.
+                </div>
+                <div className="p-5 border border-slate-200 rounded-xl">
+                  <span className="w-10 h-10 flex items-center justify-center rounded-xl bg-primary-light text-primary mb-3">
+                    <UploadCloud size={18} />
+                  </span>
+                  <h4 className="font-semibold text-slate-900 text-sm mb-1">
+                    Deploy existing code
+                  </h4>
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    Already have HTML/CSS/JS, or a built React, Vue, Angular or
+                    Svelte app? Upload the files and it's online in seconds.
                   </p>
                 </div>
               </div>
 
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-5">
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  <span className="font-semibold text-slate-800">
-                    Getting Started:
-                  </span>{" "}
-                  Go to your Dashboard and click the "+ New Site" button. You'll
-                  see both options and can choose which path works for you.
-                </p>
-              </div>
-            </section>
+              <Steps>
+                <Step title="Create your account">
+                  Register with your email and verify it, or log in if you
+                  already have an account.
+                </Step>
+                <Step title="Open your dashboard">
+                  Your dashboard lists every site you own. Click{" "}
+                  <strong>New Site</strong> in the top right — or{" "}
+                  <strong>Create Your First Site</strong> if the list is still
+                  empty.
+                  <Shot
+                    n={1}
+                    alt="Your dashboard — Create Your First Site while it's empty, or the New Site button once you have sites."
+                  />
+                </Step>
+                <Step title="Choose how to build it">
+                  A dialog asks how you want to build:{" "}
+                  <strong>Deploy existing code</strong> or{" "}
+                  <strong>Build from scratch</strong>. Pick one — the two
+                  walkthroughs below cover each path in full.
+                  <Shot
+                    n={2}
+                    alt="Choosing how to build: deploy existing code, or build from scratch."
+                  />
+                </Step>
+                <Step title="You're live">
+                  Every site is published the moment it is created, at{" "}
+                  <C>https://your-name.{APP_DOMAIN}</C> with HTTPS already in
+                  place. Connecting your own domain is free and takes about five
+                  minutes.
+                </Step>
+              </Steps>
+            </Sec>
 
-            {/* Visual Builder Setup */}
-            <section
+            {/* ── Create a site (visual) ────────────────────────────────── */}
+            <Sec
               id="visual-builder"
-              ref={(el) => {
-                sectionRefs.current["visual-builder"] = el;
-              }}
-              className="mb-14 scroll-mt-28"
+              title="Create a Site Without Code"
+              refs={refs}
+              intro="This is the “Build from scratch” path. It takes about a minute to get a blank page created and the builder open."
             >
-              <h2 className="font-bebas text-3xl text-slate-900 mb-5">
-                Creating Your First Site with Visual Builder
-              </h2>
-              <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-                Follow these step-by-step instructions to create and launch your
-                first website using the visual builder:
-              </p>
+              <Steps>
+                <Step title="Dashboard → New Site → Build from scratch">
+                  You'll land on the <strong>Build A Site</strong> page.
+                  <Shot
+                    n={3}
+                    alt="The Build A Site form — site name, optional custom URL, and the button that opens the builder."
+                  />
+                </Step>
+                <Step title="Enter a site name">
+                  Required, up to 60 characters. This is the label you'll see on
+                  your dashboard — visitors never see it, and you can rename it
+                  later. Examples: “Portfolio”, “Coffee Shop”, “Client — Acme”.
+                </Step>
+                <Step title="Pick a custom URL (optional)">
+                  <p>
+                    This becomes your free subdomain. Type <C>my-portfolio</C>{" "}
+                    and your site lives at{" "}
+                    <C>https://my-portfolio.{APP_DOMAIN}</C>.
+                  </p>
+                  <ul className="list-disc ml-5 space-y-1">
+                    <li>Lowercase letters, numbers and hyphens only</li>
+                    <li>Between 3 and 50 characters</li>
+                    <li>Leave it blank and we'll generate one for you</li>
+                    <li>
+                      Changeable later from the site's <strong>Site URL</strong>{" "}
+                      tab
+                    </li>
+                  </ul>
+                </Step>
+                <Step title="Click “Create & Start Building”">
+                  The blank site is created and the full-screen builder opens
+                  immediately on a white page.
+                </Step>
+                <Step title="Design, then Save & Deploy">
+                  Nothing is published until you press{" "}
+                  <strong>Save &amp; Deploy</strong> in the builder's top-right
+                  corner — and every press publishes straight to your live URL.
+                  <Note tone="tip" title="Coming back later">
+                    Dashboard → <strong>Edit</strong> on the site card →{" "}
+                    <strong>Layout</strong> tab →{" "}
+                    <strong>Open full-screen builder</strong>.
+                  </Note>
+                </Step>
+              </Steps>
+            </Sec>
 
-              {/* Step 1 */}
-              <div className="mb-6 p-5 border border-slate-200 rounded-xl">
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0 w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center font-semibold text-sm">
-                    1
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-slate-900 text-sm mb-2">
-                      Click "+ New Site" on Dashboard
-                    </h3>
-                    <p className="text-sm text-slate-600 mb-3">
-                      Log in to your Chasqr account and navigate to your
-                      Dashboard. Click the blue "+ New Site" button in the top
-                      right or center of the page.
-                    </p>
-                    <div className="bg-slate-50 border border-slate-200 rounded p-3 text-xs text-slate-600">
-                      [SCREENSHOT AREA: Dashboard with "+ New Site" button
-                      highlighted]
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Step 2 */}
-              <div className="mb-6 p-5 border border-slate-200 rounded-xl">
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0 w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center font-semibold text-sm">
-                    2
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-slate-900 text-sm mb-2">
-                      Choose "Build from Scratch"
-                    </h3>
-                    <p className="text-sm text-slate-600 mb-3">
-                      A modal dialog will appear with two options: "Deploy
-                      existing code" and "Build from scratch". Click on the
-                      "Build from scratch" card. This will take you to the site
-                      creation form.
-                    </p>
-                    <div className="bg-slate-50 border border-slate-200 rounded p-3 text-xs text-slate-600">
-                      [SCREENSHOT AREA: Modal dialog showing two options]
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Step 3 */}
-              <div className="mb-6 p-5 border border-slate-200 rounded-xl">
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0 w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center font-semibold text-sm">
-                    3
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-slate-900 text-sm mb-2">
-                      Enter Site Name (Required)
-                    </h3>
-                    <p className="text-sm text-slate-600 mb-3">
-                      You'll see a form with a "Site Name" field. Enter any name
-                      you like. This is just for your reference in the
-                      dashboard. Examples: "My Portfolio", "Coffee Shop",
-                      "Photography", etc. You can change this later if needed.
-                    </p>
-                    <div className="bg-slate-50 border border-slate-200 rounded p-3 text-xs text-slate-600">
-                      [SCREENSHOT AREA: Site creation form with Site Name input
-                      field]
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Step 4 */}
-              <div className="mb-6 p-5 border border-slate-200 rounded-xl">
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0 w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center font-semibold text-sm">
-                    4
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-slate-900 text-sm mb-2">
-                      Set Custom URL (Optional)
-                    </h3>
-                    <p className="text-sm text-slate-600 mb-3">
-                      Below the site name, there's a "Custom URL" field marked
-                      as optional. This becomes your website's subdomain. For
-                      example, if you enter "my-portfolio", your site will be at{" "}
-                      <span className="font-mono text-xs bg-slate-100 px-1 rounded">
-                        https://my-portfolio.chasqr.io
-                      </span>
-                      .
-                    </p>
-                    <p className="text-sm text-slate-600 mb-3">
-                      <strong>Rules:</strong> Use only lowercase letters,
-                      numbers, and hyphens. Minimum 3 characters, maximum 50. If
-                      you leave this blank, we'll auto-generate one for you. You
-                      can always change it later.
-                    </p>
-                    <div className="bg-slate-50 border border-slate-200 rounded p-3 text-xs text-slate-600">
-                      [SCREENSHOT AREA: URL input field showing example
-                      "https://my-portfolio.chasqr.io"]
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Step 5 */}
-              <div className="mb-6 p-5 border border-slate-200 rounded-xl">
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0 w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center font-semibold text-sm">
-                    5
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-slate-900 text-sm mb-2">
-                      Click "Create Site"
-                    </h3>
-                    <p className="text-sm text-slate-600 mb-3">
-                      Once you've entered your site name, click the blue "Create
-                      Site" button at the bottom of the form. The system will
-                      create your blank site and automatically open the Visual
-                      Editor.
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      You'll see a loading spinner briefly as the site is
-                      created, then the full-screen visual editor will open.
-                      This is where the magic happens!
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            {/* Using the Visual Editor */}
-            <section
-              id="builder-detailed"
-              ref={(el) => {
-                sectionRefs.current["builder-detailed"] = el;
-              }}
-              className="mb-14 scroll-mt-28"
+            {/* ── Using the builder ─────────────────────────────────────── */}
+            <Sec
+              id="builder-guide"
+              title="Using the Builder"
+              refs={refs}
+              intro="The builder takes over the whole screen: a toolbar across the top, the element palette down the left, and your page in the middle."
             >
-              <h2 className="font-bebas text-3xl text-slate-900 mb-5">
-                Using the Visual Editor - Complete Guide
-              </h2>
-              <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-                The visual editor is where you design your website. It's
-                organized into three main areas. Let's explore each one:
-              </p>
+              <Shot
+                n={4}
+                alt="The full-screen builder: toolbar across the top, element palette down the left, canvas in the middle."
+              />
 
-              {/* The Three Areas */}
-              <h3 className="font-semibold text-slate-900 text-base mb-4">
-                The Three Main Areas
+              <h3 className="font-semibold text-slate-900 text-base mt-8 mb-3">
+                The top toolbar
               </h3>
-
-              <div className="mb-8 p-5 border border-slate-200 rounded-xl bg-gradient-to-br from-blue-50 to-transparent">
-                <div className="bg-slate-50 border border-slate-200 rounded p-4 text-xs text-slate-600 mb-4">
-                  [FULL PAGE SCREENSHOT: Visual Editor showing all three areas
-                  labeled]
-                </div>
-              </div>
-
-              {/* Left Sidebar */}
-              <div className="mb-8 p-5 border-l-4 border-primary bg-primary-light/20 rounded-r-lg">
-                <h4 className="font-semibold text-slate-900 text-sm mb-3">
-                  Left Sidebar: Element Palette
-                </h4>
-                <p className="text-sm text-slate-600 mb-4 leading-relaxed">
-                  This is where all the building blocks are. You'll see a
-                  categorized list of elements you can add to your site. Here's
-                  what's available:
-                </p>
-
-                <div className="space-y-3">
-                  <div className="p-3 bg-white border border-slate-200 rounded">
-                    <p className="font-medium text-slate-800 text-sm mb-1">
-                      Text Elements
-                    </p>
-                    <p className="text-xs text-slate-600">
-                      Heading (h1-h6), Paragraph, Small Text
-                    </p>
-                  </div>
-                  <div className="p-3 bg-white border border-slate-200 rounded">
-                    <p className="font-medium text-slate-800 text-sm mb-1">
-                      Media
-                    </p>
-                    <p className="text-xs text-slate-600">Image, Video embed</p>
-                  </div>
-                  <div className="p-3 bg-white border border-slate-200 rounded">
-                    <p className="font-medium text-slate-800 text-sm mb-1">
-                      Interactive Elements
-                    </p>
-                    <p className="text-xs text-slate-600">Button, Link, Form</p>
-                  </div>
-                  <div className="p-3 bg-white border border-slate-200 rounded">
-                    <p className="font-medium text-slate-800 text-sm mb-1">
-                      Layout
-                    </p>
-                    <p className="text-xs text-slate-600">
-                      Section, Column, Grid, Divider
-                    </p>
-                  </div>
-                  <div className="p-3 bg-white border border-slate-200 rounded">
-                    <p className="font-medium text-slate-800 text-sm mb-1">
-                      Site Navigation
-                    </p>
-                    <p className="text-xs text-slate-600">
-                      Navbar (top menu), Footer (bottom menu)
-                    </p>
-                  </div>
-                </div>
-
-                <p className="text-xs text-slate-600 mt-4 leading-relaxed">
-                  To add any element, scroll through this list and click on it.
-                  Then drag it onto the canvas in the center to place it on your
-                  site.
-                </p>
-              </div>
-
-              {/* Center Canvas */}
-              <div className="mb-8 p-5 border-l-4 border-green-500 bg-green-50/20 rounded-r-lg">
-                <h4 className="font-semibold text-slate-900 text-sm mb-3">
-                  Center: Canvas (Your Website)
-                </h4>
-                <p className="text-sm text-slate-600 mb-4 leading-relaxed">
-                  This is a live preview of your website as you build it. It
-                  shows exactly how your site will look to visitors.
-                </p>
-
-                <div className="space-y-3 mb-4">
-                  <div className="p-3 bg-white border border-slate-200 rounded">
-                    <p className="font-medium text-slate-800 text-sm mb-1">
-                      📍 Dragging Elements
-                    </p>
-                    <p className="text-xs text-slate-600">
-                      Click and drag elements from the left palette onto the
-                      canvas to add them to your site. Position them wherever
-                      you like.
-                    </p>
-                  </div>
-                  <div className="p-3 bg-white border border-slate-200 rounded">
-                    <p className="font-medium text-slate-800 text-sm mb-1">
-                      🖱️ Selecting Elements
-                    </p>
-                    <p className="text-xs text-slate-600">
-                      Click on any element in the canvas to select it. You'll
-                      see it highlighted with a blue border. Once selected, you
-                      can edit it in the right panel.
-                    </p>
-                  </div>
-                  <div className="p-3 bg-white border border-slate-200 rounded">
-                    <p className="font-medium text-slate-800 text-sm mb-1">
-                      ⏱️ Right-Click Options
-                    </p>
-                    <p className="text-xs text-slate-600">
-                      Right-click on any element to see options: Copy,
-                      Duplicate, Delete, or Move. These are quick shortcuts to
-                      modify elements.
-                    </p>
-                  </div>
-                  <div className="p-3 bg-white border border-slate-200 rounded">
-                    <p className="font-medium text-slate-800 text-sm mb-1">
-                      🎯 Live Preview
-                    </p>
-                    <p className="text-xs text-slate-600">
-                      Everything updates in real-time. As you make changes, you
-                      immediately see how they look on your site.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="bg-slate-50 border border-slate-200 rounded p-3 text-xs text-slate-600">
-                  [SCREENSHOT AREA: Canvas showing website with elements,
-                  right-click menu visible]
-                </div>
-              </div>
-
-              {/* Right Panel */}
-              <div className="mb-8 p-5 border-l-4 border-orange-500 bg-orange-50/20 rounded-r-lg">
-                <h4 className="font-semibold text-slate-900 text-sm mb-3">
-                  Right Sidebar: Properties Panel
-                </h4>
-                <p className="text-sm text-slate-600 mb-4 leading-relaxed">
-                  When you select an element on the canvas, its properties
-                  appear on the right. This is where you edit everything about
-                  that element:
-                </p>
-
-                <div className="space-y-3 mb-4">
-                  <div className="p-3 bg-white border border-slate-200 rounded">
-                    <p className="font-medium text-slate-800 text-sm mb-1">
-                      ✏️ Content/Text
-                    </p>
-                    <p className="text-xs text-slate-600">
-                      Edit the actual text. Type or paste whatever you want. For
-                      images, upload or paste image URLs.
-                    </p>
-                  </div>
-                  <div className="p-3 bg-white border border-slate-200 rounded">
-                    <p className="font-medium text-slate-800 text-sm mb-1">
-                      🎨 Colors
-                    </p>
-                    <p className="text-xs text-slate-600">
-                      Change text color, background color, border color using
-                      color pickers. Click any color to open a color wheel.
-                    </p>
-                  </div>
-                  <div className="p-3 bg-white border border-slate-200 rounded">
-                    <p className="font-medium text-slate-800 text-sm mb-1">
-                      🔤 Typography
-                    </p>
-                    <p className="text-xs text-slate-600">
-                      Adjust font family (Arial, Helvetica, etc.), font size
-                      (12px-72px), and weight (light, regular, bold).
-                    </p>
-                  </div>
-                  <div className="p-3 bg-white border border-slate-200 rounded">
-                    <p className="font-medium text-slate-800 text-sm mb-1">
-                      📐 Spacing
-                    </p>
-                    <p className="text-xs text-slate-600">
-                      Control padding (space inside), margin (space outside),
-                      alignment (left/center/right), and positioning.
-                    </p>
-                  </div>
-                  <div className="p-3 bg-white border border-slate-200 rounded">
-                    <p className="font-medium text-slate-800 text-sm mb-1">
-                      ✨ Effects & Styling
-                    </p>
-                    <p className="text-xs text-slate-600">
-                      Add shadows, borders, opacity (transparency), rounded
-                      corners, and animations (hover effects).
-                    </p>
-                  </div>
-                </div>
-
-                <div className="bg-slate-50 border border-slate-200 rounded p-3 text-xs text-slate-600">
-                  [SCREENSHOT AREA: Properties panel showing all editing options
-                  for selected element]
-                </div>
-              </div>
-            </section>
-
-            {/* Building Sections */}
-            <section
-              id="editor-sections"
-              ref={(el) => {
-                sectionRefs.current["editor-sections"] = el;
-              }}
-              className="mb-14 scroll-mt-28"
-            >
-              <h2 className="font-bebas text-3xl text-slate-900 mb-5">
-                Building Sections: Step-by-Step
-              </h2>
-              <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-                Sections are the main building blocks of your site. Each section
-                can contain multiple columns and elements. Here's how to build
-                and structure your site:
-              </p>
-
-              {/* Understanding Sections */}
-              <div className="mb-6 p-5 bg-slate-50 border border-slate-200 rounded-xl">
-                <h4 className="font-semibold text-slate-900 text-sm mb-3">
-                  What is a Section?
-                </h4>
-                <p className="text-sm text-slate-600 leading-relaxed">
-                  Think of a section as a horizontal "band" across your website.
-                  It can span the full width and contain text, images, buttons,
-                  or multiple columns of content. Each section can have its own
-                  background color or image, padding, and styling.
-                </p>
-              </div>
-
-              {/* Creating a Section */}
-              <div className="mb-6 p-5 border border-slate-200 rounded-xl">
-                <h4 className="font-semibold text-slate-900 text-sm mb-4">
-                  How to Create a Section
-                </h4>
-                <p className="text-sm text-slate-600 mb-3 leading-relaxed">
-                  Look for the "+ Add Section" button in the left palette or
-                  below your existing content on the canvas. Click it to add a
-                  new blank section to your site.
-                </p>
-                <div className="bg-slate-50 border border-slate-200 rounded p-3 text-xs text-slate-600">
-                  [SCREENSHOT AREA: "+ Add Section" button highlighted]
-                </div>
-              </div>
-
-              {/* Styling a Section */}
-              <div className="mb-6 p-5 border border-slate-200 rounded-xl">
-                <h4 className="font-semibold text-slate-900 text-sm mb-4">
-                  Styling Your Section
-                </h4>
-                <p className="text-sm text-slate-600 mb-3 leading-relaxed">
-                  Click on a section to select it, then use the right panel to:
-                </p>
-                <ul className="space-y-2">
-                  <li className="text-sm text-slate-600">
-                    <span className="font-medium">Background:</span> Set a solid
-                    color or upload a background image
-                  </li>
-                  <li className="text-sm text-slate-600">
-                    <span className="font-medium">Padding:</span> Control space
-                    inside the section (how much margin around content)
-                  </li>
-                  <li className="text-sm text-slate-600">
-                    <span className="font-medium">Height:</span> Make sections
-                    taller or shorter
-                  </li>
-                  <li className="text-sm text-slate-600">
-                    <span className="font-medium">Alignment:</span> Center or
-                    align content left/right
-                  </li>
-                </ul>
-              </div>
-
-              {/* Adding Content to Sections */}
-              <div className="mb-6 p-5 border border-slate-200 rounded-xl">
-                <h4 className="font-semibold text-slate-900 text-sm mb-4">
-                  Adding Content Inside Sections
-                </h4>
-                <p className="text-sm text-slate-600 mb-4 leading-relaxed">
-                  Once you create a section, you can add elements inside it.
-                  Here's the typical workflow:
-                </p>
-
-                <div className="space-y-3">
-                  <div className="p-3 bg-white border border-slate-200 rounded">
-                    <p className="text-sm">
-                      <span className="font-mono bg-slate-100 px-1 rounded text-xs">
-                        1.
-                      </span>{" "}
-                      Select the section by clicking on it
-                    </p>
-                  </div>
-                  <div className="p-3 bg-white border border-slate-200 rounded">
-                    <p className="text-sm">
-                      <span className="font-mono bg-slate-100 px-1 rounded text-xs">
-                        2.
-                      </span>{" "}
-                      Drag elements from the left palette into the section
-                    </p>
-                  </div>
-                  <div className="p-3 bg-white border border-slate-200 rounded">
-                    <p className="text-sm">
-                      <span className="font-mono bg-slate-100 px-1 rounded text-xs">
-                        3.
-                      </span>{" "}
-                      Edit each element's content and styling in the right panel
-                    </p>
-                  </div>
-                  <div className="p-3 bg-white border border-slate-200 rounded">
-                    <p className="text-sm">
-                      <span className="font-mono bg-slate-100 px-1 rounded text-xs">
-                        4.
-                      </span>{" "}
-                      Arrange elements by dragging them around
-                    </p>
-                  </div>
-                  <div className="p-3 bg-white border border-slate-200 rounded">
-                    <p className="text-sm">
-                      <span className="font-mono bg-slate-100 px-1 rounded text-xs">
-                        5.
-                      </span>{" "}
-                      Click "Save & Deploy" when you're happy with it
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Multi-Column Layouts */}
-              <div className="mb-6 p-5 border-l-4 border-purple-500 bg-purple-50/20 rounded-r-lg">
-                <h4 className="font-semibold text-slate-900 text-sm mb-3">
-                  Creating Two-Column or Multi-Column Layouts
-                </h4>
-                <p className="text-sm text-slate-600 mb-3 leading-relaxed">
-                  Want a section with content side-by-side? Use the "Column"
-                  element:
-                </p>
-                <ol className="space-y-2 ml-4 list-decimal">
-                  <li className="text-sm text-slate-600">
-                    Drag a "Column" element from the palette into your section
-                  </li>
-                  <li className="text-sm text-slate-600">
-                    Drag another "Column" element to create a second column
-                  </li>
-                  <li className="text-sm text-slate-600">
-                    Adjust column widths using the properties panel (e.g., 50/50
-                    split, 30/70 split)
-                  </li>
-                  <li className="text-sm text-slate-600">
-                    Add content (text, images, buttons) inside each column
-                  </li>
-                </ol>
-                <div className="bg-slate-50 border border-slate-200 rounded p-3 text-xs text-slate-600 mt-3">
-                  [SCREENSHOT AREA: Two-column section example with content in
-                  each column]
-                </div>
-              </div>
-            </section>
-
-            {/* Managing Your Site */}
-            <section
-              id="manage-site"
-              ref={(el) => {
-                sectionRefs.current["manage-site"] = el;
-              }}
-              className="mb-14 scroll-mt-28"
-            >
-              <h2 className="font-bebas text-3xl text-slate-900 mb-5">
-                Managing Your Site After Creation
-              </h2>
-              <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-                Once you've created your site, go back to your dashboard and
-                click "Manage" next to your site to access the admin panel.
-                Here's what each section does:
-              </p>
-
-              <div className="space-y-4">
-                <div className="p-5 border border-slate-200 rounded-xl bg-blue-50/30">
-                  <h4 className="font-semibold text-slate-900 text-sm mb-2">
-                    📝 Editor Tab
-                  </h4>
-                  <p className="text-sm text-slate-600">
-                    Edit the text and image content on your live pages without
-                    redesigning the layout. Quick edits for copywriting changes.
-                  </p>
-                </div>
-
-                <div className="p-5 border border-slate-200 rounded-xl bg-blue-50/30">
-                  <h4 className="font-semibold text-slate-900 text-sm mb-2">
-                    🎨 Layout Tab
-                  </h4>
-                  <p className="text-sm text-slate-600">
-                    Opens the full-screen visual builder again. Use this when
-                    you want to redesign sections, add new content, or
-                    restructure your site.
-                  </p>
-                </div>
-
-                <div className="p-5 border border-slate-200 rounded-xl bg-blue-50/30">
-                  <h4 className="font-semibold text-slate-900 text-sm mb-2">
-                    🌈 Colors Tab
-                  </h4>
-                  <p className="text-sm text-slate-600">
-                    Set your site's primary, secondary, and accent colors. All
-                    elements automatically update to use these colors.
-                  </p>
-                </div>
-
-                <div className="p-5 border border-slate-200 rounded-xl bg-blue-50/30">
-                  <h4 className="font-semibold text-slate-900 text-sm mb-2">
-                    🔍 SEO Tab
-                  </h4>
-                  <p className="text-sm text-slate-600">
-                    Configure meta titles, descriptions, and Open Graph tags for
-                    better search engine rankings and social media sharing.
-                  </p>
-                </div>
-
-                <div className="p-5 border border-slate-200 rounded-xl bg-blue-50/30">
-                  <h4 className="font-semibold text-slate-900 text-sm mb-2">
-                    📊 Analytics Tab
-                  </h4>
-                  <p className="text-sm text-slate-600">
-                    View traffic statistics including pageviews, visitors,
-                    popular pages, device types, and geographic data.
-                  </p>
-                </div>
-
-                <div className="p-5 border border-slate-200 rounded-xl bg-blue-50/30">
-                  <h4 className="font-semibold text-slate-900 text-sm mb-2">
-                    📮 Submissions Tab
-                  </h4>
-                  <p className="text-sm text-slate-600">
-                    View all form submissions from your contact forms. Filter by
-                    form type and download data as CSV.
-                  </p>
-                </div>
-
-                <div className="p-5 border border-slate-200 rounded-xl bg-blue-50/30">
-                  <h4 className="font-semibold text-slate-900 text-sm mb-2">
-                    🔗 Site URL Tab
-                  </h4>
-                  <p className="text-sm text-slate-600">
-                    Change your subdomain slug (e.g., from my-site to
-                    my-new-site). Changes take effect immediately.
-                  </p>
-                </div>
-
-                <div className="p-5 border border-slate-200 rounded-xl bg-blue-50/30">
-                  <h4 className="font-semibold text-slate-900 text-sm mb-2">
-                    🌐 Custom Domain Tab
-                  </h4>
-                  <p className="text-sm text-slate-600">
-                    Connect your own domain (e.g., example.com). We handle DNS
-                    and SSL certificates automatically.
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            {/* Custom Domains */}
-            <section
-              id="custom-domains"
-              ref={(el) => {
-                sectionRefs.current["custom-domains"] = el;
-              }}
-              className="mb-14 scroll-mt-28"
-            >
-              <h2 className="font-bebas text-3xl text-slate-900 mb-5">
-                Setting Up a Custom Domain
-              </h2>
-              <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-                Your site comes with a free Chasqr subdomain (e.g.,
-                https://mysite.chasqr.io). Want your own domain? Here's how:
-              </p>
-
-              <div className="space-y-4 mb-6">
-                <div className="p-5 border border-slate-200 rounded-xl">
-                  <h4 className="font-semibold text-slate-900 text-sm mb-2">
-                    Step 1: Own Your Domain
-                  </h4>
-                  <p className="text-sm text-slate-600">
-                    Buy a domain from a registrar like GoDaddy, Namecheap,
-                    Domain.com, or Google Domains. Your domain will cost
-                    $10-15/year depending on your choice.
-                  </p>
-                </div>
-
-                <div className="p-5 border border-slate-200 rounded-xl">
-                  <h4 className="font-semibold text-slate-900 text-sm mb-2">
-                    Step 2: Go to Custom Domain Settings
-                  </h4>
-                  <p className="text-sm text-slate-600 mb-2">
-                    In your site admin, click the "Custom Domain" tab. Click
-                    "Add Domain" and enter your domain (e.g., example.com).
-                  </p>
-                  <div className="bg-slate-50 border border-slate-200 rounded p-3 text-xs text-slate-600">
-                    [SCREENSHOT AREA: Custom Domain tab with form]
-                  </div>
-                </div>
-
-                <div className="p-5 border border-slate-200 rounded-xl">
-                  <h4 className="font-semibold text-slate-900 text-sm mb-2">
-                    Step 3: Update Nameservers at Your Registrar
-                  </h4>
-                  <p className="text-sm text-slate-600 mb-3">
-                    We'll show you Cloudflare nameservers. Go to your domain
-                    registrar's settings and replace the existing nameservers
-                    with the ones we provide. This tells the internet to point
-                    your domain to our servers.
-                  </p>
-                  <div className="bg-slate-50 border border-slate-200 rounded p-3 text-xs text-slate-600">
-                    [SCREENSHOT AREA: Nameservers to use]
-                  </div>
-                </div>
-
-                <div className="p-5 border border-slate-200 rounded-xl">
-                  <h4 className="font-semibold text-slate-900 text-sm mb-2">
-                    Step 4: Wait for Propagation
-                  </h4>
-                  <p className="text-sm text-slate-600">
-                    DNS changes can take 24-48 hours to propagate globally.
-                    During this time, your site might be inaccessible via the
-                    custom domain. This is normal. Sit tight and check back in a
-                    few hours.
-                  </p>
-                </div>
-
-                <div className="p-5 border border-slate-200 rounded-xl bg-green-50/30">
-                  <h4 className="font-semibold text-slate-900 text-sm mb-2">
-                    ✅ You're Done!
-                  </h4>
-                  <p className="text-sm text-slate-600">
-                    Once propagation is complete, your site is live at your
-                    custom domain. We automatically provision a free SSL
-                    certificate so your site runs on HTTPS (secure).
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            {/* Analytics & Forms */}
-            <section
-              id="analytics-forms"
-              ref={(el) => {
-                sectionRefs.current["analytics-forms"] = el;
-              }}
-              className="mb-14 scroll-mt-28"
-            >
-              <h2 className="font-bebas text-3xl text-slate-900 mb-5">
-                Tracking Traffic & Form Submissions
-              </h2>
-
-              <div className="mb-8">
-                <h3 className="font-semibold text-slate-900 text-sm mb-4">
-                  📊 Analytics Tab: Understanding Your Traffic
-                </h3>
-                <p className="text-sm text-slate-600 mb-4 leading-relaxed">
-                  Go to Site Admin → Analytics to see how many people visit your
-                  site:
-                </p>
-
-                <div className="space-y-3">
-                  <div className="p-3 bg-slate-50 border border-slate-200 rounded text-sm">
-                    <span className="font-medium text-slate-800">
-                      Total Pageviews:
-                    </span>{" "}
-                    How many times people visited any page on your site
-                  </div>
-                  <div className="p-3 bg-slate-50 border border-slate-200 rounded text-sm">
-                    <span className="font-medium text-slate-800">
-                      Unique Visitors:
-                    </span>{" "}
-                    How many different people visited (one person visiting
-                    multiple times = 1 visitor)
-                  </div>
-                  <div className="p-3 bg-slate-50 border border-slate-200 rounded text-sm">
-                    <span className="font-medium text-slate-800">
-                      Traffic Over Time:
-                    </span>{" "}
-                    A graph showing visitors per day/week/month
-                  </div>
-                  <div className="p-3 bg-slate-50 border border-slate-200 rounded text-sm">
-                    <span className="font-medium text-slate-800">
-                      Device Breakdown:
-                    </span>{" "}
-                    What % of visitors use mobile vs desktop vs tablet
-                  </div>
-                  <div className="p-3 bg-slate-50 border border-slate-200 rounded text-sm">
-                    <span className="font-medium text-slate-800">
-                      Top Pages:
-                    </span>{" "}
-                    Which pages get the most traffic
-                  </div>
-                  <div className="p-3 bg-slate-50 border border-slate-200 rounded text-sm">
-                    <span className="font-medium text-slate-800">
-                      Geographic Data:
-                    </span>{" "}
-                    Which countries/cities your visitors come from
-                  </div>
-                </div>
-
-                <div className="bg-slate-50 border border-slate-200 rounded p-3 text-xs text-slate-600 mt-4">
-                  [SCREENSHOT AREA: Analytics dashboard with charts and stats]
-                </div>
-              </div>
-
-              <div>
-                <h3 className="font-semibold text-slate-900 text-sm mb-4">
-                  📮 Submissions Tab: Collecting Form Data
-                </h3>
-                <p className="text-sm text-slate-600 mb-4 leading-relaxed">
-                  Go to Site Admin → Submissions to see all form submissions
-                  from your site:
-                </p>
-
-                <div className="space-y-3 mb-4">
-                  <div className="p-3 bg-white border border-slate-200 rounded">
-                    <p className="text-sm">
-                      <span className="font-medium text-slate-800">
-                        View Submissions:
-                      </span>{" "}
-                      See all forms submitted with dates and data
-                    </p>
-                  </div>
-                  <div className="p-3 bg-white border border-slate-200 rounded">
-                    <p className="text-sm">
-                      <span className="font-medium text-slate-800">
-                        Filter by Form:
-                      </span>{" "}
-                      Show only submissions from a specific form
-                    </p>
-                  </div>
-                  <div className="p-3 bg-white border border-slate-200 rounded">
-                    <p className="text-sm">
-                      <span className="font-medium text-slate-800">
-                        Download as CSV:
-                      </span>{" "}
-                      Export data to Excel for analysis
-                    </p>
-                  </div>
-                  <div className="p-3 bg-white border border-slate-200 rounded">
-                    <p className="text-sm">
-                      <span className="font-medium text-slate-800">
-                        Email Notifications:
-                      </span>{" "}
-                      Get an email when someone submits a form
-                    </p>
-                  </div>
-                </div>
-
-                <div className="bg-slate-50 border border-slate-200 rounded p-3 text-xs text-slate-600 mb-4">
-                  [SCREENSHOT AREA: Submissions list showing form entries]
-                </div>
-
-                <p className="text-sm text-slate-600 leading-relaxed">
-                  Any contact form on your site automatically routes submissions
-                  here. No setup required — just add a form element to your site
-                  and we handle the rest.
-                </p>
-              </div>
-            </section>
-
-            {/* SEO Optimization */}
-            <section
-              id="seo"
-              ref={(el) => {
-                sectionRefs.current["seo"] = el;
-              }}
-              className="mb-14 scroll-mt-28"
-            >
-              <h2 className="font-bebas text-3xl text-slate-900 mb-5">
-                SEO: Making Your Site Discoverable
-              </h2>
-              <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-                SEO (Search Engine Optimization) helps your site rank higher on
-                Google and appear nicely when shared on social media. Here's how
-                to optimize:
-              </p>
-
-              <div className="mb-6 p-5 border border-slate-200 rounded-xl">
-                <h4 className="font-semibold text-slate-900 text-sm mb-4">
-                  Go to Site Admin → SEO Tab
-                </h4>
-                <p className="text-sm text-slate-600 mb-4">
-                  Set these for each page of your site:
-                </p>
-
-                <div className="space-y-4">
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="font-semibold text-slate-900 text-sm mb-2">
-                      Page Title
-                    </p>
-                    <p className="text-sm text-slate-600 mb-3">
-                      The title shown in browser tabs and Google search results.
-                      Keep it under 60 characters. Include keywords naturally.
-                      Example: "Professional Web Designer - Your City"
-                    </p>
-                    <div className="bg-white border border-slate-200 rounded p-2 text-xs text-slate-500 font-mono">
-                      [Example of how it appears in Google search]
-                    </div>
-                  </div>
-
-                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <p className="font-semibold text-slate-900 text-sm mb-2">
-                      Meta Description
-                    </p>
-                    <p className="text-sm text-slate-600 mb-3">
-                      The preview text shown under your link in Google results.
-                      Keep it under 160 characters. Make it compelling so people
-                      click. Example: "Award-winning web designer specializing
-                      in e-commerce sites. Over 10 years experience."
-                    </p>
-                    <div className="bg-white border border-slate-200 rounded p-2 text-xs text-slate-500 font-mono">
-                      [Example of how it appears in Google search]
-                    </div>
-                  </div>
-
-                  <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                    <p className="font-semibold text-slate-900 text-sm mb-2">
-                      URL Slug
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      The URL for this page (e.g., /services, /about,
-                      /portfolio). Use keywords and hyphens. Avoid numbers and
-                      special characters.
-                    </p>
-                  </div>
-
-                  <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                    <p className="font-semibold text-slate-900 text-sm mb-2">
-                      Open Graph Tags (Optional)
-                    </p>
-                    <p className="text-sm text-slate-600 mb-2">
-                      Control how your site looks when shared on Facebook,
-                      Twitter, LinkedIn:
-                    </p>
-                    <ul className="text-sm text-slate-600 space-y-1 ml-4 list-disc">
-                      <li>
-                        OG Title: What appears when someone shares your link
-                      </li>
-                      <li>
-                        OG Description: Description shown in share preview
-                      </li>
-                      <li>OG Image: The thumbnail image shown when shared</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-5 border-l-4 border-primary bg-primary-light/20 rounded-r-lg">
-                <h4 className="font-semibold text-slate-900 text-sm mb-3">
-                  💡 SEO Audit Score
-                </h4>
-                <p className="text-sm text-slate-600 mb-3">
-                  We provide a score (0-100) for each page with recommendations
-                  to improve search rankings. Common tips:
-                </p>
-                <ul className="text-sm text-slate-600 space-y-1 ml-4 list-disc">
-                  <li>Use keywords naturally in titles and descriptions</li>
-                  <li>
-                    Write unique, original content (not copied from elsewhere)
-                  </li>
-                  <li>
-                    Add alt text to images (describe what the image shows)
-                  </li>
-                  <li>
-                    Use proper heading hierarchy (h1 for main title, h2 for
-                    subtitles)
-                  </li>
-                  <li>Keep page load time under 3 seconds (optimize images)</li>
-                  <li>Get backlinks (other websites linking to you)</li>
-                </ul>
-              </div>
-            </section>
-
-            {/* How to deploy */}
-            <section
-              id="how-to-deploy"
-              ref={(el) => {
-                sectionRefs.current["how-to-deploy"] = el;
-              }}
-              className="mb-14 scroll-mt-28"
-            >
-              <h2 className="font-bebas text-3xl text-slate-900 mb-5">
-                How to Deploy Existing Code
-              </h2>
-              <div className="space-y-4">
+              <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 mb-8">
                 {[
-                  {
-                    icon: <FolderArchive size={18} />,
-                    title: "1. Prepare your files",
-                    desc: "Make sure your project has an index.html file at the root level (see Supported Project Types below for framework-specific steps).",
-                  },
-                  {
-                    icon: <Rocket size={18} />,
-                    title: "2. Upload",
-                    desc: "Go to Deploy, name your site, and upload either a ZIP file or select your project folder directly.",
-                  },
-                  {
-                    icon: <Globe size={18} />,
-                    title: "3. Go live instantly",
-                    desc: "You'll get a shareable URL immediately. Connect your own custom domain anytime from the site's settings — free SSL included.",
-                  },
-                ].map((step) => (
-                  <div
-                    key={step.title}
-                    className="flex gap-4 p-4 bg-slate-50 border border-slate-200 rounded-xl"
-                  >
-                    <div className="w-9 h-9 shrink-0 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-primary">
-                      {step.icon}
-                    </div>
-                    <div>
-                      <p className="font-medium text-slate-800 text-sm">
-                        {step.title}
-                      </p>
-                      <p className="text-sm text-slate-500 mt-0.5 leading-relaxed">
-                        {step.desc}
-                      </p>
-                    </div>
+                  ["Back", "Leaves the builder and returns to the site's Layout tab. Save first."],
+                  ["Desktop / Mobile", "Switches the canvas between full width and a phone-sized frame so you can check both."],
+                  ["Background", "Page-wide settings: background colour or gradient, page font, scroll animations, and page padding."],
+                  ["Navbar", "Turns the top navigation on and edits its brand, links, dropdowns and style."],
+                  ["Footer", "Turns the footer on and edits its text, links and colours."],
+                  ["Preview site", "Opens your published site in a new tab — what visitors currently see."],
+                  ["Save & Deploy", "Publishes the page. Greyed out until you have unsaved changes."],
+                ].map(([name, desc]) => (
+                  <div key={name} className="flex gap-4 p-4">
+                    <p className="w-36 shrink-0 text-sm font-medium text-slate-800">
+                      {name}
+                    </p>
+                    <p className="text-sm text-slate-600 leading-relaxed">
+                      {desc}
+                    </p>
                   </div>
                 ))}
               </div>
-            </section>
 
-            {/* Supported project types */}
-            <section
-              id="supported-types"
-              ref={(el) => {
-                sectionRefs.current["supported-types"] = el;
-              }}
-              className="mb-14 scroll-mt-28"
+              <h3 className="font-semibold text-slate-900 text-base mb-3">
+                The basic loop
+              </h3>
+              <div className="mb-8">
+                <Steps>
+                  <Step title="Add a section">
+                    Click <strong>Add Section</strong> at the top of the left
+                    palette. A section is a horizontal band across your page and
+                    holds one or more columns.
+                  </Step>
+                  <Step title="Select the column you want to fill">
+                    Click inside a column — the selected one is highlighted with
+                    a blue outline. New elements always land there.
+                  </Step>
+                  <Step title="Click an element in the palette">
+                    Clicking (not dragging) an element drops it into the
+                    selected column. To rearrange afterwards, drag blocks around
+                    the canvas — including from one column to another.
+                  </Step>
+                  <Step title="Style it">
+                    Click any block to reveal its toolbar: text and colours,
+                    size, alignment, spacing, links, image upload, and the
+                    options specific to that block.
+                  </Step>
+                  <Step title="Save & Deploy">
+                    Publishes everything at once. Use <strong>Preview site</strong>{" "}
+                    to check the result on the real URL.
+                  </Step>
+                </Steps>
+              </div>
+
+              <h3 className="font-semibold text-slate-900 text-base mb-3">
+                What's in the palette
+              </h3>
+              <div className="space-y-3 mb-8">
+                {PALETTE_GROUPS.map((g) => (
+                  <div
+                    key={g.title}
+                    className="p-4 border border-slate-200 rounded-xl"
+                  >
+                    <p className="font-medium text-slate-800 text-sm mb-1">
+                      {g.title}
+                    </p>
+                    <p className="text-sm text-slate-600 leading-relaxed">
+                      {g.items}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1.5">{g.note}</p>
+                  </div>
+                ))}
+              </div>
+
+              <Note tone="info" title="Page-wide settings live under “Background”">
+                Set one background colour or gradient for the whole page, choose
+                a page font from 20 Google Fonts (Inter, Poppins, Playfair
+                Display, Bebas Neue and more), turn on scroll animations so
+                sections fade in as visitors scroll, and add page padding.
+                Individual sections can override the font and background.
+              </Note>
+            </Sec>
+
+            {/* ── Sections & cards ──────────────────────────────────────── */}
+            <Sec
+              id="builder-sections"
+              title="Sections, Columns & Cards"
+              refs={refs}
+              intro="Three levels of structure: sections stack down the page, columns split a section left-to-right, and blocks (text, images, buttons) sit inside columns. Styling any of the three works the same way — select it, then use its panel."
             >
-              <h2 className="font-bebas text-3xl text-slate-900 mb-2">
-                Supported Project Types
-              </h2>
-              <p className="text-sm text-slate-500 mb-5">
-                Chasqr hosts static files — plain sites, or the compiled output
-                of frontend frameworks.
-              </p>
+              <div className="space-y-4 mb-8">
+                <Card title="Sections">
+                  <p>
+                    Select a section to set its background colour, gradient or
+                    image with an overlay; rounded corners; padding and margins;
+                    full-width or a percentage width; a minimum height (useful
+                    for hero banners); its own font; an entrance animation; and
+                    vertical alignment of its content.
+                  </p>
+                  <p>
+                    Use the arrows in the section header to move a whole section
+                    up or down the page.
+                  </p>
+                </Card>
+                <Card title="Columns">
+                  <p>
+                    Split a section into columns and drag the divider to change
+                    the balance — 50/50, 30/70, three across, whatever the
+                    layout needs.
+                  </p>
+                </Card>
+                <Card title="Turning a column into a card">
+                  <p>
+                    Give a column its own background, padding, rounded corners,
+                    shadow, border, background image with overlay and a minimum
+                    height, and it reads as a card. Add a hover effect — lift,
+                    zoom or reveal — for interactive tiles.
+                  </p>
+                  <Shot
+                    n={5}
+                    alt="A section split into two columns, each turned into a card with its own background, padding, rounding and hover effect."
+                  />
+                </Card>
+                <Card title="Navbar & footer">
+                  <p>
+                    Both are toggled from the top toolbar and are page-wide, not
+                    part of any section. The navbar takes a brand name or logo
+                    image plus links, each of which can have its own dropdown
+                    sub-links, and supports a glass style. The footer takes text,
+                    links and its own colours.
+                  </p>
+                </Card>
+                <Card title="Forms">
+                  <p>
+                    Drop in a <strong>Form</strong> element — or one of the three
+                    form templates — and it's already connected. Field types
+                    include text, email, phone, long text, dropdown, pill
+                    choices, checkbox, file and number; each field has a label,
+                    a name, an optional placeholder, a required toggle and a
+                    half- or full-width setting.
+                  </p>
+                  <p>
+                    Submissions appear in the site's{" "}
+                    <strong>Submissions</strong> tab and are emailed to you. No
+                    extra setup.
+                  </p>
+                </Card>
+              </div>
+
+              <Note tone="warn">
+                The builder edits one page at a time. Multi-page sites deployed
+                from code keep their page tabs — pick the page first, then open
+                the builder for it.
+              </Note>
+            </Sec>
+
+            {/* ── Deploy existing code ──────────────────────────────────── */}
+            <Sec
+              id="deploy-code"
+              title="Deploy Existing Code"
+              refs={refs}
+              intro="Chasqr serves static files. You upload the finished output of your project — not the source folder, and not node_modules."
+            >
+              <Steps>
+                <Step title="Build your project first">
+                  Run your framework's build command and note the output folder
+                  (<C>build/</C>, <C>dist/</C> or <C>out/</C>). Skip this if you
+                  wrote plain HTML/CSS/JS. Exact commands are in{" "}
+                  <button
+                    onClick={() => scrollTo("supported-types")}
+                    className="text-primary hover:underline"
+                  >
+                    Supported Projects
+                  </button>
+                  .
+                </Step>
+                <Step title="Dashboard → New Site → Deploy existing code">
+                  You'll land on the <strong>Deploy A Site</strong> page.
+                </Step>
+                <Step title="Name your site and pick a URL">
+                  Same rules as before: a name for your dashboard, and an
+                  optional subdomain of 3–50 lowercase characters. Selecting a
+                  ZIP fills both in automatically from the file name.
+                </Step>
+                <Step title="Upload your files">
+                  <p>Two options, both fine:</p>
+                  <ul className="list-disc ml-5 space-y-1">
+                    <li>
+                      <strong>ZIP file</strong> — with <C>index.html</C> at the
+                      top level of the archive
+                    </li>
+                    <li>
+                      <strong>Folder</strong> — pick your build folder and the
+                      browser uploads everything inside it, subfolders included
+                    </li>
+                  </ul>
+                  <Shot
+                    n={6}
+                    alt="The Deploy A Site page — switch between Upload ZIP and Upload Files, then drop your build in."
+                  />
+                </Step>
+                <Step title="Decide how the app should run">
+                  <p>
+                    Below the uploader is{" "}
+                    <strong>
+                      “This is an interactive app — keep it live”
+                    </strong>
+                    . It matters for React/Vue/Angular builds:
+                  </p>
+                  <ul className="list-disc ml-5 space-y-1">
+                    <li>
+                      <strong>Left unticked (default)</strong> — if your{" "}
+                      <C>index.html</C> is an empty app shell, we render it once
+                      and store the result as real HTML. Search engines see your
+                      content and you can edit text and images from the Editor
+                      tab. Interactive behaviour driven by JavaScript may not
+                      survive.
+                    </li>
+                    <li>
+                      <strong>Ticked</strong> — your app is served exactly as
+                      built, JavaScript intact, so buttons, state and routing all
+                      work. In-panel content editing and colour editing are off;
+                      change content in code and redeploy.
+                    </li>
+                  </ul>
+                </Step>
+                <Step title="Click “Deploy Site”">
+                  You're taken to the site's dashboard and the site is already
+                  live at <C>https://your-slug.{APP_DOMAIN}</C>.
+                </Step>
+              </Steps>
+
+              <div className="mt-8 space-y-4">
+                <Note tone="tip" title="Client-side routes work">
+                  A request for a path that doesn't match a file falls back to
+                  your <C>index.html</C>, so deep links like <C>/about</C> in a
+                  React Router or Vue Router app resolve correctly.
+                </Note>
+                <Note tone="tip" title="No base-path configuration needed">
+                  Your site is served from the root of its own subdomain, so
+                  absolute asset paths such as <C>/assets/app.js</C> work as-is —
+                  no <C>homepage</C> or <C>base</C> setting to change.
+                </Note>
+              </div>
+            </Sec>
+
+            {/* ── Supported project types ───────────────────────────────── */}
+            <Sec
+              id="supported-types"
+              title="Supported Project Types"
+              refs={refs}
+              intro="Anything that compiles down to static files. Build locally, upload the output."
+            >
               <div className="space-y-3">
                 {SUPPORTED.map((s) => (
                   <div
@@ -1239,7 +953,7 @@ export default function Docs() {
                         {s.name}
                       </p>
                     </div>
-                    <p className="text-xs text-slate-500 ml-[1.65rem] mb-1">
+                    <p className="text-xs text-slate-500 ml-[1.65rem] mb-1.5">
                       {s.detail}
                     </p>
                     <p className="text-xs text-slate-600 ml-[1.65rem] font-mono bg-slate-50 border border-slate-200 rounded px-2 py-1 inline-block">
@@ -1248,173 +962,834 @@ export default function Docs() {
                   </div>
                 ))}
               </div>
-            </section>
 
-            {/* File requirements */}
-            <section
+              <div className="mt-5">
+                <Note tone="warn" title="What doesn't work yet">
+                  Anything that needs a server at request time — PHP, a Node
+                  backend, Django, Rails, Next.js SSR or API routes. See{" "}
+                  <button
+                    onClick={() => scrollTo("roadmap")}
+                    className="text-primary hover:underline"
+                  >
+                    Coming Soon
+                  </button>
+                  . Contact forms are the exception: those are handled for you.
+                </Note>
+              </div>
+            </Sec>
+
+            {/* ── File requirements ─────────────────────────────────────── */}
+            <Sec
               id="file-requirements"
-              ref={(el) => {
-                sectionRefs.current["file-requirements"] = el;
-              }}
-              className="mb-14 scroll-mt-28"
+              title="File Requirements"
+              refs={refs}
             >
-              <h2 className="font-bebas text-3xl text-slate-900 mb-5">
-                File Requirements
-              </h2>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="p-4 border border-slate-200 rounded-xl">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <FileCode size={15} className="text-primary" />
-                    <p className="font-medium text-slate-800 text-sm">
-                      index.html is mandatory
-                    </p>
-                  </div>
-                  <p className="text-xs text-slate-500 leading-relaxed">
-                    It must sit at the root of your ZIP — not inside a
-                    subfolder. If your build tool outputs a nested folder, zip
-                    the folder's contents, not the folder itself.
+              <div className="grid sm:grid-cols-2 gap-4 mb-5">
+                <Card title="index.html at the root">
+                  <p>
+                    Mandatory, and it must sit at the top level of your ZIP — not
+                    inside a wrapper folder. If your build tool produces a
+                    folder, open it, select the contents, and zip those.
                   </p>
-                </div>
-                <div className="p-4 border border-slate-200 rounded-xl">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <Lock size={15} className="text-amber-500" />
-                    <p className="font-medium text-slate-800 text-sm">
-                      Size limits
-                    </p>
-                  </div>
-                  <p className="text-xs text-slate-500 leading-relaxed">
-                    Uploads up to 5 MB are free. Larger uploads require a
-                    one-time payment per site — after that, the site can be
-                    redeployed at any size, forever.
+                  <p className="text-xs text-slate-400">
+                    Otherwise the upload is rejected with “No index.html found”.
                   </p>
-                </div>
+                </Card>
+                <Card title="Size">
+                  <p>
+                    Uploads up to <strong>5 MB</strong> are free. Anything larger
+                    needs a one-time payment, which upgrades that site to PRO —
+                    after that it can be redeployed at any size, forever.
+                  </p>
+                </Card>
+                <Card title="Everything else comes along">
+                  <p>
+                    HTML, CSS, JavaScript, images, fonts and other static assets
+                    are all stored and served with the right content type,
+                    keeping your folder structure intact.
+                  </p>
+                </Card>
+                <Card title="Multiple pages">
+                  <p>
+                    Every <C>.html</C> file becomes a page you can edit, run SEO
+                    checks against and track separately — they show up as tabs in
+                    the Editor and SEO tabs.
+                  </p>
+                </Card>
               </div>
-            </section>
+            </Sec>
 
-            {/* Contact forms */}
-            <section
+            {/* ── Site dashboard ────────────────────────────────────────── */}
+            <Sec
+              id="site-dashboard"
+              title="Your Site Dashboard"
+              refs={refs}
+              intro="Click Edit on any site card to open its dashboard. The card itself also has quick actions: open the live site, pause it, or delete it."
+            >
+              <Note tone="warn" title="Pausing takes the site offline">
+                A paused site returns “404 — Site not found” on both its{" "}
+                {APP_DOMAIN} subdomain and any custom domain, and stops accepting
+                form submissions. Press play to bring it back.
+              </Note>
+
+              <div className="mt-6 mb-6">
+                <Shot
+                  n={7}
+                  alt="A site's dashboard — plan, status and visits at the top, everything else grouped in the left navigation."
+                />
+              </div>
+
+              <p className="text-sm text-slate-600 leading-relaxed mb-4">
+                The header shows the site's plan, whether it's live, and its
+                visit count, with buttons to preview the site or upgrade it to
+                PRO. Everything else lives in the left navigation:
+              </p>
+
+              <div className="space-y-5">
+                {ADMIN_TABS.map((g) => (
+                  <div key={g.group}>
+                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-2">
+                      {g.group}
+                    </p>
+                    <div className="border border-slate-200 rounded-xl divide-y divide-slate-100">
+                      {g.rows.map(([name, desc]) => (
+                        <div key={name} className="flex gap-4 p-4">
+                          <p className="w-32 shrink-0 text-sm font-medium text-slate-800">
+                            {name}
+                          </p>
+                          <p className="text-sm text-slate-600 leading-relaxed">
+                            {desc}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Sec>
+
+            {/* ── Content editor ────────────────────────────────────────── */}
+            <Sec
+              id="content-editor"
+              title="Editing Text & Images"
+              refs={refs}
+              intro="The Editor tab pulls every piece of text, every image and every link out of your page and lists them as editable fields — no HTML required."
+            >
+              <Steps>
+                <Step title="Pick the page">
+                  Sites with more than one page show a tab per file at the top.
+                  Switching pages with unsaved changes asks for confirmation
+                  first.
+                </Step>
+                <Step title="Filter to what you're changing">
+                  The pills at the top — All, Text, Images, Links — narrow the
+                  list, with a count on each.
+                </Step>
+                <Step title="Edit the values">
+                  <p>
+                    Type directly into a text field. For images, paste a URL or
+                    upload a file from your device, and set alt text describing
+                    the image (good for accessibility and SEO). Links take both
+                    the visible label and the destination URL.
+                  </p>
+                  <Shot
+                    n={8}
+                    alt="The Editor tab — every text, image and link on the page as an editable field, with per-element actions on the right."
+                  />
+                </Step>
+                <Step title="Restructure if you need to">
+                  Each element has quick actions: <strong>Duplicate</strong>{" "}
+                  (clones the whole card or tile it belongs to),{" "}
+                  <strong>Hide</strong> (keeps it in the file but off the live
+                  page), <strong>Delete</strong>, and{" "}
+                  <strong>Add below</strong> to insert a new text, image or link
+                  element.
+                </Step>
+                <Step title="Save & Deploy">
+                  A bar appears at the top of the screen counting your unsaved
+                  changes, with <strong>Discard</strong> and{" "}
+                  <strong>Save &amp; Deploy</strong>. Saving publishes to the
+                  live site right away.
+                </Step>
+              </Steps>
+
+              <div className="mt-6">
+                <Note tone="warn" title="Not available for live JavaScript apps">
+                  React, Vue and Angular apps deployed with the interactive
+                  option build their pages in the browser, so there's no HTML
+                  text to edit here. Update the content in your code and
+                  redeploy from <strong>Update Files</strong>.
+                </Note>
+              </div>
+            </Sec>
+
+            {/* ── Update files ──────────────────────────────────────────── */}
+            <Sec
+              id="update-files"
+              title="Updating Your Files"
+              refs={refs}
+              intro="Shipped a new build? Update Files replaces the site's contents in place."
+            >
+              <Steps>
+                <Step title="Open Settings → Update Files">
+                  Choose <strong>ZIP File</strong> or <strong>Files</strong>,
+                  matching how you want to upload.
+                </Step>
+                <Step title="Select the new build">
+                  The same rule applies — <C>index.html</C> at the root.
+                </Step>
+                <Step title="Click “Redeploy Site”">
+                  All existing files are replaced. Your URL, custom domain, SEO
+                  settings, analytics history and form submissions are all kept.
+                </Step>
+              </Steps>
+
+              <div className="mt-6 space-y-4">
+                <Note tone="info" title="Size limits still apply">
+                  On a free site, a redeploy over 5 MB prompts the same one-time
+                  payment. PRO sites redeploy at any size.
+                </Note>
+                <Note tone="info" title="Attach source code (PRO)">
+                  Below the uploader, PRO sites can attach a ZIP of the real
+                  project source. It's never served on your public site — it
+                  exists so an expert helping you gets your actual code rather
+                  than compiled output.
+                </Note>
+              </div>
+            </Sec>
+
+            {/* ── Colors ───────────────────────────────────────────────── */}
+            <Sec
+              id="colors"
+              title="Recolouring Your Site"
+              refs={refs}
+              intro="The Colors tab scans a page's stylesheets and lists every colour it uses, with how many times each one appears."
+            >
+              <Steps>
+                <Step title="Choose the page">
+                  Multi-page sites get a tab per page.
+                </Step>
+                <Step title="Click a swatch and pick a new colour">
+                  Changed swatches are highlighted and show the value they
+                  replaced. <strong>Reset</strong> undoes everything you haven't
+                  saved.
+                </Step>
+                <Step title="Save">
+                  The colour is replaced everywhere it's used, including in
+                  shared stylesheets, and the site is redeployed.
+                  <Shot
+                    n={9}
+                    alt="The Colors tab — every colour found in the page's styles, with how often each is used."
+                  />
+                </Step>
+              </Steps>
+
+              <div className="mt-6">
+                <Note tone="warn">
+                  Not available for live JavaScript apps — their styles are
+                  bundled at build time. Change your theme in code and redeploy.
+                </Note>
+              </div>
+            </Sec>
+
+            {/* ── Site URL ─────────────────────────────────────────────── */}
+            <Sec
+              id="site-url"
+              title="Changing Your Site URL"
+              refs={refs}
+              intro={`Every site gets a free subdomain on ${APP_DOMAIN}, with HTTPS included. You can change it whenever you like.`}
+            >
+              <Steps>
+                <Step title="Open Settings → Site URL">
+                  You'll see the current address with a <strong>Copy</strong>{" "}
+                  button next to it.
+                </Step>
+                <Step title="Click “Edit URL”">
+                  Type the new slug — 3 to 50 characters, lowercase letters,
+                  numbers and hyphens. Anything else is stripped as you type.
+                </Step>
+                <Step title="Confirm with the tick">
+                  The change is live immediately.
+                </Step>
+              </Steps>
+
+              <div className="mt-6">
+                <Note tone="warn" title="The old address stops working">
+                  Nothing redirects from the previous subdomain, so update any
+                  links, QR codes or social profiles that point at it.
+                </Note>
+              </div>
+            </Sec>
+
+            {/* ── Custom domains ───────────────────────────────────────── */}
+            <Sec
+              id="custom-domains"
+              title="Connecting a Custom Domain"
+              refs={refs}
+              intro="Point a domain you own — example.com, or a subdomain like blog.example.com — at your Chasqr site. It's free on every site, and HTTPS is issued automatically. Budget five minutes of work plus some waiting for DNS."
+            >
+              <Note tone="info" title="Before you start">
+                You need a domain from a registrar (GoDaddy, Namecheap,
+                Cloudflare, Hostinger, Google Domains…) and access to its DNS
+                settings. Domains typically cost $10–15 a year — Chasqr doesn't
+                sell them.
+              </Note>
+
+              <div className="mt-6">
+                <Steps>
+                  <Step title="Add the domain in Chasqr first">
+                    <p>
+                      Open your site → <strong>Settings</strong> →{" "}
+                      <strong>Custom Domain</strong>. Type the exact hostname you
+                      want visitors to use — <C>example.com</C> or{" "}
+                      <C>blog.example.com</C> — without <C>https://</C> and
+                      without a trailing slash. Press the green tick to save.
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Do this before touching DNS: a certificate is only ever
+                      issued for a domain that's already registered here.
+                    </p>
+                    <Shot
+                      n={10}
+                      alt="The Custom Domain tab before a domain is connected — type the hostname and press the tick."
+                    />
+                  </Step>
+
+                  <Step title="Copy the DNS record we show you">
+                    <p>
+                      As soon as the domain is saved, the tab displays the exact
+                      A record to create. It looks like this:
+                    </p>
+                    <div className="border border-slate-200 rounded-xl overflow-hidden">
+                      <div className="grid grid-cols-4 bg-slate-50 border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                        {["Type", "Name", "Value", "TTL"].map((h) => (
+                          <span key={h} className="px-3 py-2">
+                            {h}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-4 text-xs font-mono text-slate-700">
+                        <span className="px-3 py-2.5">A</span>
+                        <span className="px-3 py-2.5">@</span>
+                        <span className="px-3 py-2.5 text-primary break-all">
+                          {SITE_IP}
+                        </span>
+                        <span className="px-3 py-2.5">3600</span>
+                      </div>
+                    </div>
+                    <Shot
+                      n={11}
+                      alt="Once saved, the tab shows the exact A record to create at your registrar — and a green dot marks the site as having a domain."
+                    />
+                  </Step>
+
+                  <Step title="Create that record at your registrar">
+                    <p>
+                      Find the DNS management screen for your domain and add a
+                      new record:
+                    </p>
+                    <ul className="list-disc ml-5 space-y-1">
+                      <li>
+                        <strong>Root domain</strong> (<C>example.com</C>) — Type{" "}
+                        <C>A</C>, Name <C>@</C>, Value <C>{SITE_IP}</C>, TTL{" "}
+                        <C>3600</C>
+                      </li>
+                      <li>
+                        <strong>Subdomain</strong> (<C>blog.example.com</C>) —
+                        Type <C>A</C>, Name <C>blog</C> (just the label, not the
+                        full domain), same value and TTL
+                      </li>
+                    </ul>
+                    <p>
+                      Delete or edit any existing A or CNAME record with the same
+                      name — a leftover parking-page record will keep winning.
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Where to look: GoDaddy → My Products → DNS; Namecheap →
+                      Domain List → Manage → Advanced DNS; Cloudflare → DNS →
+                      Records; Hostinger → Domains → DNS / Nameservers.
+                    </p>
+                  </Step>
+
+                  <Step title="Wait for DNS to propagate">
+                    <p>
+                      Usually a few minutes to a couple of hours, occasionally up
+                      to 48. Check progress from a terminal:
+                    </p>
+                    <Code>{`nslookup example.com
+
+# It's ready when the answer is ${SITE_IP}`}</Code>
+                  </Step>
+
+                  <Step title="Open your domain over HTTPS">
+                    <p>
+                      Visit <C>https://example.com</C>. The certificate is issued
+                      on that first request, so the very first load can take a
+                      few extra seconds — after that it's instant, and renewals
+                      are automatic. There's nothing to upload and no
+                      certificate to manage.
+                    </p>
+                  </Step>
+                </Steps>
+              </div>
+
+              <h3 className="font-semibold text-slate-900 text-base mt-10 mb-3">
+                Rules worth knowing
+              </h3>
+              <div className="space-y-3">
+                <Card title="One domain per site">
+                  <p>
+                    A site serves one custom hostname, and a hostname can't be
+                    connected to two sites — saving one that's already in use is
+                    rejected.
+                  </p>
+                </Card>
+                <Card title="www and the root are different hostnames">
+                  <p>
+                    <C>example.com</C> and <C>www.example.com</C> are treated
+                    separately. Connect whichever you want visitors to use, then
+                    redirect the other at your DNS provider or registrar (most
+                    offer a free forwarding / redirect rule).
+                  </p>
+                </Card>
+                <Card title="Using Cloudflare as your DNS host?">
+                  <p>
+                    Set the record to <strong>DNS only</strong> (grey cloud)
+                    rather than proxied. Proxying puts Cloudflare's own
+                    certificate in front of ours and is the usual cause of
+                    redirect loops and SSL errors.
+                  </p>
+                </Card>
+                <Card title="Removing a domain">
+                  <p>
+                    The <strong>Remove</strong> button disconnects it instantly.
+                    Your site stays online at its {APP_DOMAIN} subdomain, and the
+                    domain is free to reconnect elsewhere.
+                  </p>
+                </Card>
+              </div>
+
+              <div className="mt-6">
+                <Note tone="warn" title="Domain not resolving?">
+                  Work through it in order: the site is live (not paused) → the
+                  hostname in the Custom Domain tab matches exactly what you're
+                  typing in the browser → <C>nslookup</C> returns {SITE_IP} → no
+                  conflicting A/CNAME record remains. More cases in{" "}
+                  <button
+                    onClick={() => scrollTo("troubleshooting")}
+                    className="text-primary hover:underline"
+                  >
+                    Troubleshooting
+                  </button>
+                  .
+                </Note>
+              </div>
+            </Sec>
+
+            {/* ── SEO ──────────────────────────────────────────────────── */}
+            <Sec
+              id="seo"
+              title="SEO"
+              refs={refs}
+              intro="The SEO tab has three parts: an audit that scores each page, a one-click fixer for the mechanical problems, and manual controls for your titles, descriptions, social previews and favicon."
+            >
+              <div className="space-y-4 mb-8">
+                <Card title="1. Run the SEO check">
+                  <p>
+                    Pick a page and press <strong>Run SEO Check</strong>. We
+                    fetch the live page and run 20+ checks — title, meta
+                    description, canonical URL, indexing rules, H1 and heading
+                    structure, language attribute, mobile viewport, image alt
+                    text, content depth, internal and external links, Open Graph
+                    tags, HTTPS and response time — then score it out of 100.
+                  </p>
+                  <p>
+                    Each result is written in plain English: what's wrong, and
+                    why it matters.
+                  </p>
+                  <Shot
+                    n={12}
+                    alt="An SEO report — overall score, a breakdown by category, and every issue explained in plain English."
+                  />
+                </Card>
+                <Card title="2. Fix issues automatically">
+                  <p>
+                    <strong>Fix Issues Automatically</strong> handles the
+                    mechanical basics — page title, meta description, canonical
+                    link, viewport, language attribute, social tags and missing
+                    image alt text — then redeploys and re-scores the page, and
+                    lists exactly what it changed.
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    It can't write your content for you: depth, linking and page
+                    speed stay in your hands.
+                  </p>
+                </Card>
+                <Card title="3. Fine-tune the details">
+                  <p>Below the audit you can set, per page:</p>
+                  <ul className="list-disc ml-5 space-y-1">
+                    <li>
+                      <strong>Page Title</strong> — up to 60 characters, shown in
+                      the browser tab and search results
+                    </li>
+                    <li>
+                      <strong>Meta Description</strong> — up to 160 characters,
+                      the snippet under your search result
+                    </li>
+                    <li>
+                      <strong>OG Image URL</strong> — the thumbnail used when
+                      your link is shared; at least 1200×630px
+                    </li>
+                    <li>
+                      <strong>OG Title</strong> and{" "}
+                      <strong>OG Description</strong> — override the above for
+                      social platforms
+                    </li>
+                  </ul>
+                  <p>
+                    Live Google and social previews sit beside the form, so you
+                    can see truncation before you publish. Saving redeploys.
+                  </p>
+                </Card>
+                <Card title="Favicon">
+                  <p>
+                    Also in this tab: upload a favicon or paste an image URL. It
+                    applies to every page. A square PNG or ICO of at least 32×32
+                    works best.
+                  </p>
+                </Card>
+              </div>
+
+              <Note tone="tip" title="Free checker for any website">
+                The{" "}
+                <Link to="/seo-checker" className="text-primary hover:underline">
+                  SEO Checker
+                </Link>{" "}
+                runs the same audit on any public URL — your site, a client's, a
+                competitor's — with no account needed. Sites hosted here get the
+                deeper check plus one-click fixes.
+              </Note>
+            </Sec>
+
+            {/* ── Analytics ────────────────────────────────────────────── */}
+            <Sec
+              id="analytics"
+              title="Analytics"
+              refs={refs}
+              intro="Visit tracking is built in — nothing to install, no third-party script, no cookie banner."
+            >
+              <div className="space-y-3 mb-6">
+                {[
+                  [
+                    "Total Visits",
+                    "Every page request your site has served since it was created.",
+                  ],
+                  [
+                    "Last 30 Days",
+                    "Visits in the last month — the number to watch after a launch or a campaign.",
+                  ],
+                  [
+                    "Daily Average",
+                    "Your typical day, useful as a baseline to compare spikes against.",
+                  ],
+                  [
+                    "30-day chart",
+                    "A bar per day, with today highlighted. Hover any bar for its exact count.",
+                  ],
+                ].map(([name, desc]) => (
+                  <div
+                    key={name}
+                    className="p-4 bg-slate-50 border border-slate-200 rounded-xl"
+                  >
+                    <p className="font-medium text-slate-800 text-sm mb-0.5">
+                      {name}
+                    </p>
+                    <p className="text-sm text-slate-600 leading-relaxed">
+                      {desc}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <Shot
+                n={13}
+                alt="The Analytics tab — total visits, the last 30 days, your daily average, and a bar per day."
+              />
+
+              <div className="mt-6">
+                <Note tone="info">
+                  Visits are counted on your live site, whether visitors arrive
+                  through the {APP_DOMAIN} subdomain or your custom domain.
+                  Per-country, per-device and per-page breakdowns aren't
+                  available yet — add Google Analytics to your page for those.
+                </Note>
+              </div>
+            </Sec>
+
+            {/* ── Contact forms ────────────────────────────────────────── */}
+            <Sec
               id="contact-forms"
-              ref={(el) => {
-                sectionRefs.current["contact-forms"] = el;
-              }}
-              className="mb-14 scroll-mt-28"
+              title="Contact Forms"
+              refs={refs}
+              intro="Chasqr captures form submissions for you — every field lands in the site's Submissions tab and is emailed to your account address. Pick whichever route matches how your site was made."
             >
-              <h2 className="font-bebas text-3xl text-slate-900 mb-2">
-                Connect a Contact Form
-              </h2>
-              <p className="text-sm text-slate-500 mb-5 leading-relaxed">
-                Chasqr captures submissions from any contact form on your site —
-                every field lands in your{" "}
-                <span className="font-medium text-slate-700">Submissions</span>{" "}
-                tab and is emailed to you.
-              </p>
-
-              <div className="p-4 bg-primary-light border border-primary/20 rounded-xl mb-6">
-                <p className="text-sm text-slate-700 leading-relaxed">
-                  <span className="font-semibold">Easiest way — no code:</span>{" "}
-                  if your uploaded HTML already has a form, open your site →{" "}
-                  <span className="font-medium">Submissions</span>, and it's
-                  auto-detected. Just click{" "}
-                  <span className="font-medium">Connect</span>. That's it.
-                </p>
+              <div className="space-y-4 mb-8">
+                <Card title="A. Built with the visual builder — nothing to do">
+                  <p>
+                    Any <strong>Form</strong> element or form template you drop
+                    in is already wired up. Publish and start receiving messages.
+                  </p>
+                </Card>
+                <Card title="B. Uploaded HTML with a form — one click">
+                  <p>
+                    We scan your pages and list the forms we find. Open{" "}
+                    <strong>Submissions</strong>, find yours, and press{" "}
+                    <strong>Connect</strong> — likely contact forms are flagged
+                    for you. Leave search bars, logins and newsletter widgets
+                    disconnected.
+                  </p>
+                  <Shot
+                    n={14}
+                    alt="The Submissions tab — a form detected in your uploaded HTML, waiting for one click to connect it."
+                  />
+                </Card>
+                <Card title="C. Your own form, wired manually">
+                  <p>
+                    Point the form at your site's submit endpoint. The{" "}
+                    <strong>Submissions</strong> tab shows the exact URL with a
+                    copy button; your site ID is also the code in the dashboard
+                    URL (<C>/sites/&lt;id&gt;</C>).
+                  </p>
+                </Card>
               </div>
 
-              <p className="text-sm font-semibold text-slate-700 mb-1">
-                Manual setup
-              </p>
-              <p className="text-sm text-slate-500 mb-3 leading-relaxed">
-                For full control, point your form at your site's submit
-                endpoint:
-              </p>
-              <code className="block text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-mono text-slate-700 mb-2 overflow-x-auto">
+              <code className="block text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 font-mono text-slate-700 mb-6 overflow-x-auto">
                 {API_URL}/api/forms/&lt;your-site-id&gt;/submit
               </code>
-              <p className="text-xs text-slate-400 mb-6">
-                Your <span className="font-medium">site ID</span> is the code in
-                the dashboard URL while editing your site (
-                <span className="font-mono">/sites/&lt;id&gt;</span>) — the
-                exact endpoint is also shown in your Submissions tab.
-              </p>
 
-              <p className="text-sm font-semibold text-slate-700 mb-1">
-                Option A — No code (page reloads on submit)
+              <p className="text-sm font-semibold text-slate-800 mb-1">
+                Option 1 — plain HTML, no JavaScript
               </p>
-              <p className="text-sm text-slate-500 mb-2">
-                Set your form's{" "}
-                <code className="bg-slate-100 px-1 rounded text-xs">
-                  action
-                </code>{" "}
-                and{" "}
-                <code className="bg-slate-100 px-1 rounded text-xs">
-                  method
-                </code>
-                . The optional hidden field redirects visitors back after
-                sending:
+              <p className="text-sm text-slate-600 mb-3 leading-relaxed">
+                Set the form's <C>action</C> and <C>method</C>. The optional
+                hidden <C>_redirect</C> field sends visitors to a thank-you page
+                after submitting.
               </p>
-              <pre className="text-[11px] bg-slate-900 text-slate-100 rounded-lg p-3 overflow-x-auto mb-6">
-                <code>{`<form action="${API_URL}/api/forms/<your-site-id>/submit" method="POST">
-  <input type="hidden" name="_redirect" value="https://yoursite.chasqr.com/thank-you">
-  <!-- your existing fields — any names work -->
+              <Code>{`<form action="${API_URL}/api/forms/<your-site-id>/submit" method="POST">
+  <input type="hidden" name="_redirect" value="https://yoursite.${APP_DOMAIN}/thank-you">
+  <input type="text"  name="name"    placeholder="Your name">
+  <input type="email" name="email"   placeholder="you@example.com">
+  <textarea           name="message" placeholder="Your message"></textarea>
   <button type="submit">Send</button>
-</form>`}</code>
-              </pre>
+</form>`}</Code>
+              <p className="text-xs text-slate-500 mt-2 mb-6 leading-relaxed">
+                <C>_redirect</C> must be an <C>https://</C> address on your own
+                site — your {APP_DOMAIN} subdomain or your connected custom
+                domain. Anything else is ignored, which keeps the endpoint from
+                being used to bounce people elsewhere.
+              </p>
 
-              <p className="text-sm font-semibold text-slate-700 mb-1">
-                Option B — Stay on the page (add a small script)
+              <p className="text-sm font-semibold text-slate-800 mb-1">
+                Option 2 — stay on the page
               </p>
-              <p className="text-sm text-slate-500 mb-2">
-                Add{" "}
-                <code className="bg-slate-100 px-1 rounded text-xs">
-                  data-chasqr-form
-                </code>{" "}
-                to your{" "}
-                <code className="bg-slate-100 px-1 rounded text-xs">
-                  &lt;form&gt;
-                </code>{" "}
-                tag, then paste this before{" "}
-                <code className="bg-slate-100 px-1 rounded text-xs">
-                  &lt;/body&gt;
-                </code>
-                :
+              <p className="text-sm text-slate-600 mb-3 leading-relaxed">
+                Add <C>data-chasqr-form</C> to your <C>&lt;form&gt;</C> tag, then
+                paste this just before <C>&lt;/body&gt;</C>:
               </p>
-              <pre className="text-[11px] bg-slate-900 text-slate-100 rounded-lg p-3 overflow-x-auto mb-4">
-                <code>{`<script>
-document.querySelectorAll('[data-chasqr-form]').forEach(function(f){
-  f.addEventListener('submit', function(e){
+              <Code>{`<script>
+document.querySelectorAll('[data-chasqr-form]').forEach(function (f) {
+  f.addEventListener('submit', function (e) {
     e.preventDefault();
     var data = Object.fromEntries(new FormData(f));
     fetch("${API_URL}/api/forms/<your-site-id>/submit", {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
-    }).then(function(){ f.reset(); alert('Thanks — your message was sent!'); });
+    }).then(function () {
+      f.reset();
+      alert('Thanks — your message was sent!');
+    });
   });
 });
-</script>`}</code>
-              </pre>
-              <p className="text-xs text-slate-400">
-                Tip: fields need a <span className="font-mono">name</span>{" "}
-                attribute to be captured. The one-click Connect handles this for
-                you automatically; for manual setup, make sure each field has
-                one.
-              </p>
-            </section>
+</script>`}</Code>
 
-            {/* Not yet supported */}
-            <section
-              id="roadmap"
-              ref={(el) => {
-                sectionRefs.current["roadmap"] = el;
-              }}
-              className="mb-14 scroll-mt-28"
+              <h3 className="font-semibold text-slate-900 text-base mt-8 mb-3">
+                What gets captured
+              </h3>
+              <ul className="text-sm text-slate-600 leading-relaxed list-disc ml-5 space-y-1.5 mb-6">
+                <li>
+                  Every field needs a <C>name</C> attribute — fields without one
+                  are invisible to the browser and never reach us. One-click
+                  Connect handles this for you.
+                </li>
+                <li>
+                  Any field names work; whatever you send is stored and shown.
+                </li>
+                <li>
+                  Up to 30 fields per submission, 5,000 characters per field.
+                  Empty fields are dropped.
+                </li>
+                <li>
+                  Names beginning with an underscore are reserved for control
+                  parameters like <C>_redirect</C>.
+                </li>
+              </ul>
+
+              <h3 className="font-semibold text-slate-900 text-base mb-3">
+                Where messages land
+              </h3>
+              <ul className="text-sm text-slate-600 leading-relaxed list-disc ml-5 space-y-1.5">
+                <li>
+                  In the <strong>Submissions</strong> tab — the 500 most recent,
+                  newest first, each with its timestamp and a delete button.
+                </li>
+                <li>
+                  In your inbox: we email your account address on every
+                  submission and set reply-to to the sender's email when we can
+                  detect it, so replying goes straight to them.
+                </li>
+              </ul>
+            </Sec>
+
+            {/* ── PRO & billing ────────────────────────────────────────── */}
+            <Sec
+              id="pro-billing"
+              title="PRO & Billing"
+              refs={refs}
+              intro="Chasqr is free to use. PRO is a one-time payment per site — no subscription, no renewals."
             >
-              <h2 className="font-bebas text-3xl text-slate-900 mb-2">
-                Coming Soon
-              </h2>
-              <p className="text-sm text-slate-500 mb-5">
-                These features require server-side processing which we're
-                working on:
-              </p>
+              <div className="grid sm:grid-cols-2 gap-4 mb-6">
+                <div className="p-5 border border-slate-200 rounded-xl">
+                  <h4 className="font-semibold text-slate-900 text-sm mb-2">
+                    Free on every site
+                  </h4>
+                  <ul className="text-sm text-slate-600 space-y-1.5 list-disc ml-4">
+                    <li>Hosting on a {APP_DOMAIN} subdomain, HTTPS included</li>
+                    <li>The visual builder and the content editor</li>
+                    <li>A custom domain, with automatic HTTPS</li>
+                    <li>SEO audit, auto-fix, analytics and contact forms</li>
+                    <li>Uploads up to 5 MB</li>
+                    <li>Expert help requests</li>
+                  </ul>
+                </div>
+                <div className="p-5 border border-amber-200 bg-amber-50/40 rounded-xl">
+                  <h4 className="font-semibold text-slate-900 text-sm mb-2">
+                    PRO adds, per site
+                  </h4>
+                  <ul className="text-sm text-slate-600 space-y-1.5 list-disc ml-4">
+                    <li>Uploads and redeploys of any size, forever</li>
+                    <li>
+                      Attaching your project's source code for experts helping
+                      you
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="space-y-3 mb-6">
+                <Card title="Two ways to end up on PRO">
+                  <ul className="list-disc ml-5 space-y-1.5">
+                    <li>
+                      <strong>Deploy something over 5 MB.</strong> You're
+                      prompted for a one-time $2.99 payment; it unlocks that
+                      upload and upgrades the site to PRO.
+                    </li>
+                    <li>
+                      <strong>Press “Upgrade to PRO”</strong> on the site
+                      dashboard. The price is calculated from that specific site
+                      — $1.49 base, plus $0.20 per MB of stored size and $0.15
+                      per page, with a $1.49 minimum and a $14.99 cap. The modal
+                      shows the full breakdown before you pay.
+                    </li>
+                  </ul>
+                </Card>
+                <Card title="Paying">
+                  <p>
+                    Razorpay and Cashfree are both supported — pick either at
+                    checkout. If one is unavailable we fall back to the other and
+                    tell you.
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Prices here are shown in US dollars for reference. Checkout
+                    is processed in Indian rupees — ₹199 for a large upload, and
+                    ₹99–₹999 for a site upgrade.
+                  </p>
+                </Card>
+                <Card title="Transactions">
+                  <p>
+                    The{" "}
+                    <Link
+                      to="/transactions"
+                      className="text-primary hover:underline"
+                    >
+                      Transactions
+                    </Link>{" "}
+                    page lists every payment with its ID and amount, and shows
+                    any unused credits — a credit bought for a large upload you
+                    didn't finish stays on your account for next time.
+                  </p>
+                </Card>
+              </div>
+            </Sec>
+
+            {/* ── Expert help ──────────────────────────────────────────── */}
+            <Sec
+              id="expert-help"
+              title="Expert Help"
+              refs={refs}
+              intro="Would rather someone else made the change? Every site has an Expert Help tab that connects you to a verified expert about that specific site."
+            >
+              <Steps>
+                <Step title="Open the site → Expert Help">
+                  You'll see available experts with their title, skills and
+                  current availability.
+                </Step>
+                <Step title="Pick an expert and describe what you need">
+                  Be specific — which page, what should change, what the end
+                  result should look like.
+                </Step>
+                <Step title="Chat it through">
+                  Once your request is sent, a live chat opens with that expert.
+                  Replies arrive in real time and unread messages show as a badge
+                  on the tab while you're elsewhere in the dashboard. You can
+                  cancel a request that hasn't been picked up yet.
+                </Step>
+                <Step title="Share your source code (PRO)">
+                  If the site is PRO, attach a ZIP of your real project under{" "}
+                  <strong>Update Files</strong> so the expert works with your
+                  actual code rather than the compiled output.
+                </Step>
+              </Steps>
+            </Sec>
+
+            {/* ── Troubleshooting ──────────────────────────────────────── */}
+            <Sec
+              id="troubleshooting"
+              title="Troubleshooting"
+              refs={refs}
+              intro="The problems that come up most often, and what fixes them."
+            >
+              <div className="border border-slate-200 rounded-xl divide-y divide-slate-100">
+                {TROUBLESHOOTING.map((t) => (
+                  <div key={t.q} className="p-5">
+                    <p className="font-semibold text-slate-900 text-sm mb-1.5">
+                      {t.q}
+                    </p>
+                    <p className="text-sm text-slate-600 leading-relaxed">
+                      {t.a}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </Sec>
+
+            {/* ── Roadmap ──────────────────────────────────────────────── */}
+            <Sec
+              id="roadmap"
+              title="Coming Soon"
+              refs={refs}
+              intro="Chasqr serves static files today, so anything needing code to run on the server at request time isn't supported yet. These are what we're working on:"
+            >
               <div className="flex flex-wrap gap-2">
                 {UPCOMING.map((u) => (
                   <span
@@ -1425,31 +1800,25 @@ document.querySelectorAll('[data-chasqr-form]').forEach(function(f){
                   </span>
                 ))}
               </div>
-            </section>
+            </Sec>
 
-            {/* Need help */}
-            <section
-              id="get-help"
-              ref={(el) => {
-                sectionRefs.current["get-help"] = el;
-              }}
-              className="p-6 bg-primary-light border border-primary/20 rounded-2xl scroll-mt-28"
-            >
-              <h2 className="font-bebas text-2xl text-slate-900 mb-1.5">
-                Still Have Questions?
-              </h2>
-              <p className="text-sm text-slate-600 leading-relaxed mb-4">
-                If you need personalized help or prefer to have an expert make
-                changes for you, reach out from your site's dashboard — we have
-                verified experts ready to assist.
-              </p>
-              <Link
-                to="/dashboard"
-                className="inline-flex items-center gap-2 bg-primary text-white font-semibold px-5 py-2.5 rounded-xl hover:bg-primary-dark transition-colors text-sm"
-              >
-                Go to Dashboard
-              </Link>
-            </section>
+            {/* ── Get help ─────────────────────────────────────────────── */}
+            <Sec id="get-help" title="Still Stuck?" refs={refs}>
+              <div className="p-6 bg-primary-light border border-primary/20 rounded-2xl">
+                <p className="text-sm text-slate-700 leading-relaxed mb-4">
+                  If none of the above covers it, or you'd rather have someone
+                  make the change for you, open your site and use the{" "}
+                  <strong>Expert Help</strong> tab — verified experts are ready
+                  to assist, and it's free to ask.
+                </p>
+                <Link
+                  to="/dashboard"
+                  className="inline-flex items-center gap-2 bg-primary text-white font-semibold px-5 py-2.5 rounded-xl hover:bg-primary-dark transition-colors text-sm"
+                >
+                  Go to Dashboard
+                </Link>
+              </div>
+            </Sec>
           </motion.div>
         </div>
       </div>
