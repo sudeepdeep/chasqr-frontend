@@ -6,8 +6,10 @@ import {
   Clock,
   CreditCard,
   FileCode,
+  FolderGit2,
   Globe,
   Headset,
+  Image as ImageIcon,
   Info,
   Layers,
   LayoutTemplate,
@@ -22,6 +24,7 @@ import {
   Rocket,
   Search,
   Settings,
+  ShieldCheck,
   UploadCloud,
 } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -120,6 +123,10 @@ const ADMIN_TABS = [
         "Update Files",
         "Replace your site's files with a new build, keeping the same URL.",
       ],
+      [
+        "GitHub",
+        "For imported sites: the connected repo, auto-deploy, and deploy history.",
+      ],
     ],
   },
   {
@@ -174,6 +181,18 @@ const TROUBLESHOOTING = [
     q: "Form submissions are not arriving",
     a: "Open the Submissions tab and check the form shows as Connected. Every field also needs a name attribute, and the site must be live — a paused site rejects submissions.",
   },
+  {
+    q: "My repository isn't in the import list",
+    a: 'Chasqr only sees the repositories you granted it. Use "Adjust which ones Chasqr can access" at the bottom of the list to add more on GitHub, then hit refresh. Note that a repository owned by an organisation may need an owner to approve the installation.',
+  },
+  {
+    q: "The import says there's no index.html",
+    a: "Your built output isn't committed — most frameworks gitignore dist/ and build/ by default. Build locally, commit that folder, and import again. If the error lists folders it did find, pick one of those instead.",
+  },
+  {
+    q: "I pushed but the site didn't update",
+    a: "Check the GitHub tab on your site — it records the outcome of every attempt. Confirm auto-deploy is on and that you pushed to the connected branch; pushes to other branches are ignored by design. If the last deploy shows as skipped or failed, the message there says why, and your previous version is still serving.",
+  },
 ];
 
 const SECTION_GROUPS: {
@@ -195,7 +214,8 @@ const SECTION_GROUPS: {
   {
     label: "Deploy your code",
     items: [
-      { id: "deploy-code", label: "Deploy Existing Code", icon: UploadCloud },
+      { id: "import-github", label: "Import from GitHub", icon: FolderGit2 },
+      { id: "deploy-code", label: "Upload Your Files", icon: UploadCloud },
       { id: "supported-types", label: "Supported Projects", icon: Layers },
       { id: "file-requirements", label: "File Requirements", icon: FileCode },
     ],
@@ -222,6 +242,7 @@ const SECTION_GROUPS: {
   {
     label: "Account & help",
     items: [
+      { id: "account", label: "Account & Security", icon: ShieldCheck },
       { id: "pro-billing", label: "PRO & Billing", icon: CreditCard },
       { id: "expert-help", label: "Expert Help", icon: Headset },
       { id: "troubleshooting", label: "Troubleshooting", icon: LifeBuoy },
@@ -357,8 +378,29 @@ function Note({
   );
 }
 
-/** Screenshot with a caption. `n` is the doc-<n>.png in /public/images. */
-function Shot({ n, alt }: { n: number; alt: string }) {
+/**
+ * Screenshot with a caption. `n` is the doc-<n>.png in /public/images.
+ * `pending` renders a placeholder instead — drop the prop once the image
+ * has been added, rather than shipping a broken <img>.
+ */
+function Shot({
+  n,
+  alt,
+  pending,
+}: {
+  n: number;
+  alt: string;
+  pending?: boolean;
+}) {
+  if (pending) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-xs text-slate-400">
+        <ImageIcon size={13} className="shrink-0" />
+        <span>Screenshot — {alt}</span>
+      </div>
+    );
+  }
+
   return (
     <figure className="my-1">
       <img
@@ -555,9 +597,35 @@ export default function Docs() {
               id="getting-started"
               title="Getting Started"
               refs={refs}
-              intro="Chasqr hosts websites and gives you a visual builder to make them. There are two ways in, and you can use both — one site built by hand, another deployed from code."
+              intro="Chasqr hosts websites and gives you a visual builder to make them. There are three ways in, and nothing stops you using all of them — one site built by hand, another imported from a repo."
             >
-              <div className="grid sm:grid-cols-2 gap-4 mb-6">
+              <div className="grid sm:grid-cols-3 gap-4 mb-6">
+                <div className="p-5 border border-slate-200 rounded-xl">
+                  <span className="w-10 h-10 flex items-center justify-center rounded-xl bg-primary-light text-primary mb-3">
+                    <FolderGit2 size={18} />
+                  </span>
+                  <h4 className="font-semibold text-slate-900 text-sm mb-1">
+                    Import from GitHub
+                  </h4>
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    Connect a repository and deploy the built output committed
+                    in it — then let every push update the live site
+                    automatically.
+                  </p>
+                </div>
+                <div className="p-5 border border-slate-200 rounded-xl">
+                  <span className="w-10 h-10 flex items-center justify-center rounded-xl bg-primary-light text-primary mb-3">
+                    <UploadCloud size={18} />
+                  </span>
+                  <h4 className="font-semibold text-slate-900 text-sm mb-1">
+                    Upload your files
+                  </h4>
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    Already have HTML/CSS/JS, or a built React, Vue, Angular or
+                    Svelte app? Drop in a ZIP or a folder and it's online in
+                    seconds.
+                  </p>
+                </div>
                 <div className="p-5 border border-slate-200 rounded-xl">
                   <span className="w-10 h-10 flex items-center justify-center rounded-xl bg-primary-light text-primary mb-3">
                     <Paintbrush size={18} />
@@ -568,27 +636,18 @@ export default function Docs() {
                   <p className="text-sm text-slate-600 leading-relaxed">
                     Start with a blank page and drop in headings, images,
                     buttons, forms, a navbar and a footer. No code at any point.
-                    Best for portfolios, landing pages and small business sites.
-                  </p>
-                </div>
-                <div className="p-5 border border-slate-200 rounded-xl">
-                  <span className="w-10 h-10 flex items-center justify-center rounded-xl bg-primary-light text-primary mb-3">
-                    <UploadCloud size={18} />
-                  </span>
-                  <h4 className="font-semibold text-slate-900 text-sm mb-1">
-                    Deploy existing code
-                  </h4>
-                  <p className="text-sm text-slate-600 leading-relaxed">
-                    Already have HTML/CSS/JS, or a built React, Vue, Angular or
-                    Svelte app? Upload the files and it's online in seconds.
                   </p>
                 </div>
               </div>
 
               <Steps>
                 <Step title="Create your account">
-                  Register with your email and verify it, or log in if you
-                  already have an account.
+                  Sign up with your email and verify it, or use{" "}
+                  <strong>Continue with Google</strong> or{" "}
+                  <strong>Sign up with GitHub</strong> to skip straight past the
+                  form. Signing in with GitHub doesn't give Chasqr access to any
+                  of your code — that's a separate, per-repository step you take
+                  later, only if you want to import something.
                 </Step>
                 <Step title="Open your dashboard">
                   Your dashboard lists every site you own. Click{" "}
@@ -602,8 +661,9 @@ export default function Docs() {
                 </Step>
                 <Step title="Choose how to build it">
                   A dialog asks how you want to build:{" "}
-                  <strong>Deploy existing code</strong> or{" "}
-                  <strong>Build from scratch</strong>. Pick one — the two
+                  <strong>Import from GitHub</strong>,{" "}
+                  <strong>Deploy existing code</strong>, or{" "}
+                  <strong>Build from scratch</strong>. Pick one — the
                   walkthroughs below cover each path in full.
                   <Shot
                     n={2}
@@ -689,13 +749,34 @@ export default function Docs() {
               </h3>
               <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 mb-8">
                 {[
-                  ["Back", "Leaves the builder and returns to the site's Layout tab. Save first."],
-                  ["Desktop / Mobile", "Switches the canvas between full width and a phone-sized frame so you can check both."],
-                  ["Background", "Page-wide settings: background colour or gradient, page font, scroll animations, and page padding."],
-                  ["Navbar", "Turns the top navigation on and edits its brand, links, dropdowns and style."],
-                  ["Footer", "Turns the footer on and edits its text, links and colours."],
-                  ["Preview site", "Opens your published site in a new tab — what visitors currently see."],
-                  ["Save & Deploy", "Publishes the page. Greyed out until you have unsaved changes."],
+                  [
+                    "Back",
+                    "Leaves the builder and returns to the site's Layout tab. Save first.",
+                  ],
+                  [
+                    "Desktop / Mobile",
+                    "Switches the canvas between full width and a phone-sized frame so you can check both.",
+                  ],
+                  [
+                    "Background",
+                    "Page-wide settings: background colour or gradient, page font, scroll animations, and page padding.",
+                  ],
+                  [
+                    "Navbar",
+                    "Turns the top navigation on and edits its brand, links, dropdowns and style.",
+                  ],
+                  [
+                    "Footer",
+                    "Turns the footer on and edits its text, links and colours.",
+                  ],
+                  [
+                    "Preview site",
+                    "Opens your published site in a new tab — what visitors currently see.",
+                  ],
+                  [
+                    "Save & Deploy",
+                    "Publishes the page. Greyed out until you have unsaved changes.",
+                  ],
                 ].map(([name, desc]) => (
                   <div key={name} className="flex gap-4 p-4">
                     <p className="w-36 shrink-0 text-sm font-medium text-slate-800">
@@ -733,8 +814,9 @@ export default function Docs() {
                     options specific to that block.
                   </Step>
                   <Step title="Save & Deploy">
-                    Publishes everything at once. Use <strong>Preview site</strong>{" "}
-                    to check the result on the real URL.
+                    Publishes everything at once. Use{" "}
+                    <strong>Preview site</strong> to check the result on the
+                    real URL.
                   </Step>
                 </Steps>
               </div>
@@ -759,7 +841,10 @@ export default function Docs() {
                 ))}
               </div>
 
-              <Note tone="info" title="Page-wide settings live under “Background”">
+              <Note
+                tone="info"
+                title="Page-wide settings live under “Background”"
+              >
                 Set one background colour or gradient for the whole page, choose
                 a page font from 20 Google Fonts (Inter, Poppins, Playfair
                 Display, Bebas Neue and more), turn on scroll animations so
@@ -813,15 +898,15 @@ export default function Docs() {
                     Both are toggled from the top toolbar and are page-wide, not
                     part of any section. The navbar takes a brand name or logo
                     image plus links, each of which can have its own dropdown
-                    sub-links, and supports a glass style. The footer takes text,
-                    links and its own colours.
+                    sub-links, and supports a glass style. The footer takes
+                    text, links and its own colours.
                   </p>
                 </Card>
                 <Card title="Forms">
                   <p>
-                    Drop in a <strong>Form</strong> element — or one of the three
-                    form templates — and it's already connected. Field types
-                    include text, email, phone, long text, dropdown, pill
+                    Drop in a <strong>Form</strong> element — or one of the
+                    three form templates — and it's already connected. Field
+                    types include text, email, phone, long text, dropdown, pill
                     choices, checkbox, file and number; each field has a label,
                     a name, an optional placeholder, a required toggle and a
                     half- or full-width setting.
@@ -841,12 +926,174 @@ export default function Docs() {
               </Note>
             </Sec>
 
+            {/* ── Import from GitHub ────────────────────────────────────── */}
+            <Sec
+              id="import-github"
+              title="Import From GitHub"
+              refs={refs}
+              intro="Connect a repository once and Chasqr deploys the built output committed in it — then redeploys automatically every time you push. Private repositories work exactly the same as public ones."
+            >
+              <Note tone="warn" title="Chasqr doesn't run your build">
+                We serve static files, so there's no <C>npm run build</C> step
+                on our side. Your repository must contain the finished output —
+                a committed <C>dist/</C>, <C>build/</C> or <C>out/</C> folder,
+                or plain HTML at the root. If your repo only holds source, build
+                it locally and commit the output folder before importing.
+              </Note>
+
+              <div className="mt-8">
+                <Steps>
+                  <Step title="Dashboard → New Site → Import from GitHub">
+                    The first time through, you'll be asked to connect your
+                    GitHub account.
+                    <Shot
+                      n={15}
+                      alt="The Import from GitHub page before a GitHub account is connected."
+                    />
+                  </Step>
+
+                  <Step title="Choose which repositories Chasqr can see">
+                    <p>
+                      GitHub asks you to install the Chasqr app. You pick either{" "}
+                      <strong>All repositories</strong> or{" "}
+                      <strong>Only select repositories</strong> — we'd suggest
+                      selecting just the ones you plan to deploy. You can change
+                      the list any time from GitHub.
+                    </p>
+                    <p>
+                      Chasqr only ever asks for <strong>read</strong> access to
+                      repository contents. It cannot push, open pull requests,
+                      or change anything in your code.
+                    </p>
+                  </Step>
+
+                  <Step title="Pick the repository and branch">
+                    Your repositories are listed most-recently-updated first,
+                    with a search box. Choose one, then pick the branch to
+                    deploy from — usually <C>main</C>.
+                    <Shot
+                      n={16}
+                      alt="Choosing a repository, branch and output folder in the import wizard."
+                    />
+                  </Step>
+
+                  <Step title="Confirm the output folder">
+                    <p>
+                      Chasqr scans the branch for <C>index.html</C> and offers
+                      the folders it finds, preselecting the most likely one (
+                      <C>dist</C>, <C>build</C> and <C>out</C> rank first). Pick{" "}
+                      <strong>Repository root</strong> if your HTML sits at the
+                      top level.
+                    </p>
+                    <p>
+                      If nothing is found you'll get a text box and a warning —
+                      that almost always means the built output isn't committed
+                      yet.
+                    </p>
+                  </Step>
+
+                  <Step title="Name it and choose your options">
+                    <p>
+                      Site name and custom URL work exactly as everywhere else.
+                      Two checkboxes matter here:
+                    </p>
+                    <ul className="list-disc ml-5 space-y-1">
+                      <li>
+                        <strong>Redeploy automatically on every push</strong> —
+                        on by default, and the reason most people use this.
+                      </li>
+                      <li>
+                        <strong>This is an interactive app</strong> — same
+                        meaning as on the upload page: tick it for React/Vue/
+                        Angular apps that need live JavaScript, leave it off for
+                        regular sites so you can edit text and images in the
+                        panel.
+                      </li>
+                    </ul>
+                  </Step>
+
+                  <Step title="Deploy From GitHub">
+                    We pull the branch, deploy that folder, and your site is
+                    live. From here on, pushing to that branch updates it on its
+                    own.
+                  </Step>
+                </Steps>
+              </div>
+
+              <h3 className="font-semibold text-slate-900 text-base mt-10 mb-3">
+                Automatic deploys
+              </h3>
+              <div className="space-y-3 mb-6">
+                <Card title="What triggers one">
+                  <p>
+                    Any push to the branch you connected. Pushes to other
+                    branches, and tags, are ignored. Your site normally updates
+                    within a minute.
+                  </p>
+                </Card>
+                <Card title="Watching what happened">
+                  <p>
+                    Open your site → <strong>Settings</strong> →{" "}
+                    <strong>GitHub</strong>. It shows the connected repo, branch
+                    and folder, the auto-deploy toggle, and the result of the
+                    last deploy with its commit and timestamp — so a push that
+                    didn't take is visible rather than silent.
+                  </p>
+                  <Shot
+                    n={17}
+                    alt="The GitHub tab on a site, showing the connected repo, auto-deploy toggle and last deploy status."
+                  />
+                </Card>
+                <Card title="When a deploy is skipped">
+                  <p>
+                    An automatic deploy never spends money. If a free site's
+                    build grows past the 5 MB limit, the deploy is recorded as{" "}
+                    <strong>skipped</strong> with an explanation and{" "}
+                    <strong>your live site is left exactly as it was</strong> —
+                    no credit is consumed and nothing breaks. Upgrade the site
+                    to PRO and the next push goes through.
+                  </p>
+                </Card>
+                <Card title="When a deploy fails">
+                  <p>
+                    Same principle: if the commit you pushed has no{" "}
+                    <C>index.html</C> in the configured folder, the failure is
+                    recorded and the previously deployed version keeps serving.
+                    A broken commit can't take your site down.
+                  </p>
+                </Card>
+                <Card title="Deploying on demand">
+                  <p>
+                    <strong>Redeploy latest commit</strong> in the GitHub tab
+                    pulls the current branch immediately — handy if you turned
+                    auto-deploy off, or a webhook was missed.
+                  </p>
+                </Card>
+                <Card title="Disconnecting">
+                  <p>
+                    <strong>Disconnect</strong> unlinks the repository; your
+                    site stays online exactly as last deployed and simply stops
+                    updating. To revoke Chasqr's access entirely, remove the app
+                    from GitHub → Settings → Applications.
+                  </p>
+                </Card>
+              </div>
+
+              <Note tone="tip" title="Working with a framework">
+                Most frameworks gitignore their build folder by default, which
+                is the usual reason a first import finds no <C>index.html</C>.
+                Either remove that line from <C>.gitignore</C> and commit the
+                folder, or add a GitHub Action that builds and commits it on
+                every push.
+              </Note>
+            </Sec>
+
             {/* ── Deploy existing code ──────────────────────────────────── */}
             <Sec
               id="deploy-code"
-              title="Deploy Existing Code"
+              title="Upload Your Files"
               refs={refs}
-              intro="Chasqr serves static files. You upload the finished output of your project — not the source folder, and not node_modules."
+              intro="Chasqr serves static files. You upload the finished output of your project — not the source folder, and not node_modules. If your project lives on GitHub, importing it is usually less work than uploading."
             >
               <Steps>
                 <Step title="Build your project first">
@@ -889,9 +1136,7 @@ export default function Docs() {
                 <Step title="Decide how the app should run">
                   <p>
                     Below the uploader is{" "}
-                    <strong>
-                      “This is an interactive app — keep it live”
-                    </strong>
+                    <strong>“This is an interactive app — keep it live”</strong>
                     . It matters for React/Vue/Angular builds:
                   </p>
                   <ul className="list-disc ml-5 space-y-1">
@@ -905,9 +1150,9 @@ export default function Docs() {
                     </li>
                     <li>
                       <strong>Ticked</strong> — your app is served exactly as
-                      built, JavaScript intact, so buttons, state and routing all
-                      work. In-panel content editing and colour editing are off;
-                      change content in code and redeploy.
+                      built, JavaScript intact, so buttons, state and routing
+                      all work. In-panel content editing and colour editing are
+                      off; change content in code and redeploy.
                     </li>
                   </ul>
                 </Step>
@@ -925,8 +1170,8 @@ export default function Docs() {
                 </Note>
                 <Note tone="tip" title="No base-path configuration needed">
                   Your site is served from the root of its own subdomain, so
-                  absolute asset paths such as <C>/assets/app.js</C> work as-is —
-                  no <C>homepage</C> or <C>base</C> setting to change.
+                  absolute asset paths such as <C>/assets/app.js</C> work as-is
+                  — no <C>homepage</C> or <C>base</C> setting to change.
                 </Note>
               </div>
             </Sec>
@@ -979,16 +1224,12 @@ export default function Docs() {
             </Sec>
 
             {/* ── File requirements ─────────────────────────────────────── */}
-            <Sec
-              id="file-requirements"
-              title="File Requirements"
-              refs={refs}
-            >
+            <Sec id="file-requirements" title="File Requirements" refs={refs}>
               <div className="grid sm:grid-cols-2 gap-4 mb-5">
                 <Card title="index.html at the root">
                   <p>
-                    Mandatory, and it must sit at the top level of your ZIP — not
-                    inside a wrapper folder. If your build tool produces a
+                    Mandatory, and it must sit at the top level of your ZIP —
+                    not inside a wrapper folder. If your build tool produces a
                     folder, open it, select the contents, and zip those.
                   </p>
                   <p className="text-xs text-slate-400">
@@ -997,9 +1238,9 @@ export default function Docs() {
                 </Card>
                 <Card title="Size">
                   <p>
-                    Uploads up to <strong>5 MB</strong> are free. Anything larger
-                    needs a one-time payment, which upgrades that site to PRO —
-                    after that it can be redeployed at any size, forever.
+                    Uploads up to <strong>5 MB</strong> are free. Anything
+                    larger needs a one-time payment, which upgrades that site to
+                    PRO — after that it can be redeployed at any size, forever.
                   </p>
                 </Card>
                 <Card title="Everything else comes along">
@@ -1012,8 +1253,8 @@ export default function Docs() {
                 <Card title="Multiple pages">
                   <p>
                     Every <C>.html</C> file becomes a page you can edit, run SEO
-                    checks against and track separately — they show up as tabs in
-                    the Editor and SEO tabs.
+                    checks against and track separately — they show up as tabs
+                    in the Editor and SEO tabs.
                   </p>
                 </Card>
               </div>
@@ -1028,8 +1269,8 @@ export default function Docs() {
             >
               <Note tone="warn" title="Pausing takes the site offline">
                 A paused site returns “404 — Site not found” on both its{" "}
-                {APP_DOMAIN} subdomain and any custom domain, and stops accepting
-                form submissions. Press play to bring it back.
+                {APP_DOMAIN} subdomain and any custom domain, and stops
+                accepting form submissions. Press play to bring it back.
               </Note>
 
               <div className="mt-6 mb-6">
@@ -1101,9 +1342,8 @@ export default function Docs() {
                   Each element has quick actions: <strong>Duplicate</strong>{" "}
                   (clones the whole card or tile it belongs to),{" "}
                   <strong>Hide</strong> (keeps it in the file but off the live
-                  page), <strong>Delete</strong>, and{" "}
-                  <strong>Add below</strong> to insert a new text, image or link
-                  element.
+                  page), <strong>Delete</strong>, and <strong>Add below</strong>{" "}
+                  to insert a new text, image or link element.
                 </Step>
                 <Step title="Save & Deploy">
                   A bar appears at the top of the screen counting your unsaved
@@ -1114,7 +1354,10 @@ export default function Docs() {
               </Steps>
 
               <div className="mt-6">
-                <Note tone="warn" title="Not available for live JavaScript apps">
+                <Note
+                  tone="warn"
+                  title="Not available for live JavaScript apps"
+                >
                   React, Vue and Angular apps deployed with the interactive
                   option build their pages in the browser, so there's no HTML
                   text to edit here. Update the content in your code and
@@ -1128,7 +1371,7 @@ export default function Docs() {
               id="update-files"
               title="Updating Your Files"
               refs={refs}
-              intro="Shipped a new build? Update Files replaces the site's contents in place."
+              intro="Shipped a new build? Update Files replaces the site's contents in place. (Sites imported from GitHub update themselves on every push — see the GitHub tab instead.)"
             >
               <Steps>
                 <Step title="Open Settings → Update Files">
@@ -1240,8 +1483,8 @@ export default function Docs() {
                   <Step title="Add the domain in Chasqr first">
                     <p>
                       Open your site → <strong>Settings</strong> →{" "}
-                      <strong>Custom Domain</strong>. Type the exact hostname you
-                      want visitors to use — <C>example.com</C> or{" "}
+                      <strong>Custom Domain</strong>. Type the exact hostname
+                      you want visitors to use — <C>example.com</C> or{" "}
                       <C>blog.example.com</C> — without <C>https://</C> and
                       without a trailing slash. Press the green tick to save.
                     </p>
@@ -1301,8 +1544,9 @@ export default function Docs() {
                       </li>
                     </ul>
                     <p>
-                      Delete or edit any existing A or CNAME record with the same
-                      name — a leftover parking-page record will keep winning.
+                      Delete or edit any existing A or CNAME record with the
+                      same name — a leftover parking-page record will keep
+                      winning.
                     </p>
                     <p className="text-xs text-slate-500">
                       Where to look: GoDaddy → My Products → DNS; Namecheap →
@@ -1313,8 +1557,8 @@ export default function Docs() {
 
                   <Step title="Wait for DNS to propagate">
                     <p>
-                      Usually a few minutes to a couple of hours, occasionally up
-                      to 48. Check progress from a terminal:
+                      Usually a few minutes to a couple of hours, occasionally
+                      up to 48. Check progress from a terminal:
                     </p>
                     <Code>{`nslookup example.com
 
@@ -1323,10 +1567,10 @@ export default function Docs() {
 
                   <Step title="Open your domain over HTTPS">
                     <p>
-                      Visit <C>https://example.com</C>. The certificate is issued
-                      on that first request, so the very first load can take a
-                      few extra seconds — after that it's instant, and renewals
-                      are automatic. There's nothing to upload and no
+                      Visit <C>https://example.com</C>. The certificate is
+                      issued on that first request, so the very first load can
+                      take a few extra seconds — after that it's instant, and
+                      renewals are automatic. There's nothing to upload and no
                       certificate to manage.
                     </p>
                   </Step>
@@ -1363,8 +1607,8 @@ export default function Docs() {
                 <Card title="Removing a domain">
                   <p>
                     The <strong>Remove</strong> button disconnects it instantly.
-                    Your site stays online at its {APP_DOMAIN} subdomain, and the
-                    domain is free to reconnect elsewhere.
+                    Your site stays online at its {APP_DOMAIN} subdomain, and
+                    the domain is free to reconnect elsewhere.
                   </p>
                 </Card>
               </div>
@@ -1429,8 +1673,8 @@ export default function Docs() {
                   <p>Below the audit you can set, per page:</p>
                   <ul className="list-disc ml-5 space-y-1">
                     <li>
-                      <strong>Page Title</strong> — up to 60 characters, shown in
-                      the browser tab and search results
+                      <strong>Page Title</strong> — up to 60 characters, shown
+                      in the browser tab and search results
                     </li>
                     <li>
                       <strong>Meta Description</strong> — up to 160 characters,
@@ -1462,7 +1706,10 @@ export default function Docs() {
 
               <Note tone="tip" title="Free checker for any website">
                 The{" "}
-                <Link to="/seo-checker" className="text-primary hover:underline">
+                <Link
+                  to="/seo-checker"
+                  className="text-primary hover:underline"
+                >
                   SEO Checker
                 </Link>{" "}
                 runs the same audit on any public URL — your site, a client's, a
@@ -1531,13 +1778,14 @@ export default function Docs() {
               id="contact-forms"
               title="Contact Forms"
               refs={refs}
-              intro="Chasqr captures form submissions for you — every field lands in the site's Submissions tab and is emailed to your account address. Pick whichever route matches how your site was made."
+              intro="Chasqr captures form submissions for you — every field lands in the site's Submissions tab and is emailed to you the moment it arrives. No third-party form service, no monthly fee. Pick whichever route matches how your site was made."
             >
               <div className="space-y-4 mb-8">
                 <Card title="A. Built with the visual builder — nothing to do">
                   <p>
                     Any <strong>Form</strong> element or form template you drop
-                    in is already wired up. Publish and start receiving messages.
+                    in is already wired up. Publish and start receiving
+                    messages.
                   </p>
                 </Card>
                 <Card title="B. Uploaded HTML with a form — one click">
@@ -1593,8 +1841,8 @@ export default function Docs() {
                 Option 2 — stay on the page
               </p>
               <p className="text-sm text-slate-600 mb-3 leading-relaxed">
-                Add <C>data-chasqr-form</C> to your <C>&lt;form&gt;</C> tag, then
-                paste this just before <C>&lt;/body&gt;</C>:
+                Add <C>data-chasqr-form</C> to your <C>&lt;form&gt;</C> tag,
+                then paste this just before <C>&lt;/body&gt;</C>:
               </p>
               <Code>{`<script>
 document.querySelectorAll('[data-chasqr-form]').forEach(function (f) {
@@ -1638,17 +1886,128 @@ document.querySelectorAll('[data-chasqr-form]').forEach(function (f) {
               <h3 className="font-semibold text-slate-900 text-base mb-3">
                 Where messages land
               </h3>
-              <ul className="text-sm text-slate-600 leading-relaxed list-disc ml-5 space-y-1.5">
-                <li>
-                  In the <strong>Submissions</strong> tab — the 500 most recent,
-                  newest first, each with its timestamp and a delete button.
-                </li>
-                <li>
-                  In your inbox: we email your account address on every
-                  submission and set reply-to to the sender's email when we can
-                  detect it, so replying goes straight to them.
-                </li>
-              </ul>
+              <div className="space-y-4">
+                <Card title="In your dashboard">
+                  <p>
+                    The <strong>Submissions</strong> tab holds the 500 most
+                    recent, newest first. Each shows the sender's name and email
+                    pulled out of the fields, every other field below it, the
+                    time it arrived, and a delete button.
+                  </p>
+                </Card>
+                <Card title="In your inbox — automatically">
+                  <p>
+                    Every submission is emailed to your Chasqr account address
+                    the moment it arrives. Nothing to switch on, and no
+                    forwarding address to configure.
+                  </p>
+                  <ul className="list-disc ml-5 space-y-1">
+                    <li>
+                      The subject names the site and the sender, so it's obvious
+                      at a glance which form fired
+                    </li>
+                    <li>Every submitted field is laid out in the body</li>
+                    <li>
+                      <strong>Reply-to is set to the sender's address</strong>{" "}
+                      when we can spot an email among the fields — so hitting
+                      reply in your mail client answers the person directly,
+                      rather than emailing yourself
+                    </li>
+                  </ul>
+                </Card>
+              </div>
+
+              <div className="mt-5">
+                <Note tone="tip" title="Not seeing the emails?">
+                  Check the spam folder first and mark one as "not spam" —
+                  notifications go to the address on your Chasqr account, so
+                  it's also worth confirming that address is one you actually
+                  read. A missing email never means a lost message: the
+                  submission is stored either way and is always in the
+                  Submissions tab.
+                </Note>
+              </div>
+            </Sec>
+
+            {/* ── Account & security ───────────────────────────────────── */}
+            <Sec
+              id="account"
+              title="Account & Security"
+              refs={refs}
+              intro="Everything about your login lives on the Profile page — open it from your avatar in the top-right corner."
+            >
+              <div className="space-y-4 mb-8">
+                <Card title="Display name">
+                  <p>
+                    The name shown in Chasqr and used when an expert is helping
+                    you. Changing it doesn't affect your sites.
+                  </p>
+                </Card>
+                <Card title="Password">
+                  <p>
+                    Set a new one by entering your current password alongside
+                    it. Forgotten it? Use <strong>Forgot password</strong> on
+                    the sign-in page and we'll email you a reset link.
+                  </p>
+                </Card>
+                <Card title="Email verification">
+                  <p>
+                    New accounts get a 6-digit code by email to confirm the
+                    address before the first sign-in. Codes last 10 minutes, and
+                    you can request a new one after 60 seconds. Signing up with
+                    Google or GitHub skips this — those providers have already
+                    verified your address.
+                  </p>
+                </Card>
+              </div>
+
+              <h3 className="font-semibold text-slate-900 text-base mb-3">
+                Two-factor authentication
+              </h3>
+              <p className="text-sm text-slate-600 leading-relaxed mb-5">
+                Adds a second step at sign-in, so a leaked password isn't enough
+                on its own to reach your account and your live sites.
+              </p>
+
+              <Steps>
+                <Step title="Profile → Two-Factor Authentication → Enable">
+                  We email a 6-digit code to your account address straight away.
+                </Step>
+                <Step title="Enter the code">
+                  Type it into the six boxes — it submits itself on the last
+                  digit. The card then shows an <strong>Enabled</strong> badge.
+                </Step>
+                <Step title="From then on, every sign-in asks for a code">
+                  <p>
+                    After your password is accepted we email a fresh code and
+                    hold the sign-in until you enter it. Codes expire after 10
+                    minutes; you can resend after 60 seconds.
+                  </p>
+                  <p>
+                    This applies to <strong>every</strong> way into your account
+                    — password, Google and GitHub all hit the same check, so
+                    turning it on can't be sidestepped by using a social login.
+                  </p>
+                </Step>
+                <Step title="Turning it off">
+                  Profile → <strong>Disable</strong>, then confirm with your
+                  account password.
+                </Step>
+              </Steps>
+
+              <div className="mt-6 space-y-4">
+                <Note tone="warn" title="Signed up with Google or GitHub?">
+                  Disabling two-factor asks for an account password, and a
+                  social-only account has never had one set. Use{" "}
+                  <strong>Forgot password</strong> to create one first, then
+                  disable. Worth knowing before you turn it on.
+                </Note>
+                <Note tone="info" title="Codes arrive by email">
+                  There's no authenticator app to set up and nothing to scan —
+                  which also means access to your email inbox is what protects
+                  the account. Keep that address secure.
+                </Note>
+              </div>
             </Sec>
 
             {/* ── PRO & billing ────────────────────────────────────────── */}
@@ -1706,8 +2065,8 @@ document.querySelectorAll('[data-chasqr-form]').forEach(function (f) {
                 <Card title="Paying">
                   <p>
                     Razorpay and Cashfree are both supported — pick either at
-                    checkout. If one is unavailable we fall back to the other and
-                    tell you.
+                    checkout. If one is unavailable we fall back to the other
+                    and tell you.
                   </p>
                   <p className="text-xs text-slate-500">
                     Prices here are shown in US dollars for reference. Checkout
@@ -1750,9 +2109,9 @@ document.querySelectorAll('[data-chasqr-form]').forEach(function (f) {
                 </Step>
                 <Step title="Chat it through">
                   Once your request is sent, a live chat opens with that expert.
-                  Replies arrive in real time and unread messages show as a badge
-                  on the tab while you're elsewhere in the dashboard. You can
-                  cancel a request that hasn't been picked up yet.
+                  Replies arrive in real time and unread messages show as a
+                  badge on the tab while you're elsewhere in the dashboard. You
+                  can cancel a request that hasn't been picked up yet.
                 </Step>
                 <Step title="Share your source code (PRO)">
                   If the site is PRO, attach a ZIP of your real project under{" "}
