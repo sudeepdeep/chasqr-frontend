@@ -7,6 +7,7 @@ import AppLayout from './layout/AppLayout';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import GithubCallback from './pages/GithubCallback';
 import Docs from './pages/Docs';
 import SeoChecker from './pages/SeoChecker';
 import Terms from './pages/Terms';
@@ -17,6 +18,7 @@ import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import Upload from './pages/Upload';
 import Build from './pages/Build';
+import ImportGithub from './pages/ImportGithub';
 import Builder from './pages/Builder';
 import SiteAdmin from './pages/SiteAdmin';
 import AdminPanel from './pages/AdminPanel';
@@ -27,6 +29,9 @@ import ProtectedRoute from './components/ProtectedRoute';
 const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
   { path: '/register', element: <Register /> },
+  // Outside ProtectedRoute on purpose — the user isn't signed in yet when
+  // GitHub redirects them back here.
+  { path: '/auth/github/callback', element: <GithubCallback /> },
   {
     path: '/sites/:siteId/builder',
     element: <ProtectedRoute><Builder /></ProtectedRoute>,
@@ -57,6 +62,10 @@ const router = createBrowserRouter([
       {
         path: '/build',
         element: <ProtectedRoute><Build /></ProtectedRoute>,
+      },
+      {
+        path: '/import/github',
+        element: <ProtectedRoute><ImportGithub /></ProtectedRoute>,
       },
       {
         path: '/sites/:siteId',

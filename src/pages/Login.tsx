@@ -7,6 +7,7 @@ import { setAuth } from '../store/auth';
 import AuthSplitLayout from '../layout/AuthSplitLayout';
 import PasswordInput from '../components/PasswordInput';
 import EmailOtpVerify from '../components/EmailOtpVerify';
+import GithubButton from '../components/GithubButton';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -92,15 +93,18 @@ export default function Login() {
       <h2 className="font-bebas text-3xl text-slate-900 mb-1">Sign in</h2>
       <p className="text-slate-500 text-sm mb-6">Welcome back — enter your details below.</p>
 
-      <div className="flex justify-center mb-6">
-        <GoogleLogin
-          onSuccess={(res) => res.credential && handleGoogle(res.credential)}
-          onError={() => toast.error('Google login failed')}
-          theme="outline"
-          size="large"
-          width="100%"
-          text="signin_with"
-        />
+      <div className="flex flex-col gap-3 mb-6">
+        <div className="flex justify-center">
+          <GoogleLogin
+            onSuccess={(res) => res.credential && handleGoogle(res.credential)}
+            onError={() => toast.error('Google login failed')}
+            theme="outline"
+            size="large"
+            width="100%"
+            text="signin_with"
+          />
+        </div>
+        <GithubButton label="Sign in with GitHub" />
       </div>
 
       <div className="flex items-center gap-3 mb-6">

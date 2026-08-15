@@ -29,6 +29,9 @@ export const disableMfaAPI = (password: string) =>
 export const googleAuthAPI = (credential: string) =>
   api.post('/api/auth/google', { credential });
 
+export const githubAuthAPI = (code: string, installationId?: number) =>
+  api.post('/api/auth/github', installationId ? { code, installationId } : { code });
+
 export const getMeAPI = () => api.get('/api/auth/me');
 
 export const updateProfileAPI = (name: string) => api.put('/api/auth/me', { name });

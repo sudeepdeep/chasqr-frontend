@@ -7,6 +7,7 @@ import { setAuth } from '../store/auth';
 import AuthSplitLayout from '../layout/AuthSplitLayout';
 import PasswordInput from '../components/PasswordInput';
 import EmailOtpVerify from '../components/EmailOtpVerify';
+import GithubButton from '../components/GithubButton';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -67,15 +68,18 @@ export default function Register() {
       <h2 className="font-bebas text-3xl text-slate-900 mb-1">Sign up for Chasqr</h2>
       <p className="text-slate-500 text-sm mb-6">Free forever for basic use — no credit card required.</p>
 
-      <div className="flex justify-center mb-6">
-        <GoogleLogin
-          onSuccess={(res) => res.credential && handleGoogle(res.credential)}
-          onError={() => toast.error('Google login failed')}
-          theme="outline"
-          size="large"
-          width="100%"
-          text="signup_with"
-        />
+      <div className="flex flex-col gap-3 mb-6">
+        <div className="flex justify-center">
+          <GoogleLogin
+            onSuccess={(res) => res.credential && handleGoogle(res.credential)}
+            onError={() => toast.error('Google login failed')}
+            theme="outline"
+            size="large"
+            width="100%"
+            text="signup_with"
+          />
+        </div>
+        <GithubButton label="Sign up with GitHub" />
       </div>
 
       <div className="flex items-center gap-3 mb-6">
@@ -148,7 +152,7 @@ export default function Register() {
       </form>
 
       <p className="text-center text-xs text-slate-400 mt-4">
-        By continuing with Google, you also agree to our{' '}
+        By continuing with Google or GitHub, you also agree to our{' '}
         <Link to="/terms" target="_blank" className="text-primary hover:underline">Terms</Link>
         {' '}and{' '}
         <Link to="/privacy" target="_blank" className="text-primary hover:underline">Privacy Policy</Link>.

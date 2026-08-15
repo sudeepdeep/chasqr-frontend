@@ -7,7 +7,7 @@ import { uploadZipAPI, uploadFilesAPI } from '../api/site.api';
 import { getPaymentInfoAPI } from '../api/payment.api';
 import FileUploader from '../components/FileUploader';
 import PaymentModal from '../components/PaymentModal';
-import { APP_DOMAIN } from '../lib/siteUrl';
+import SlugInput from '../components/SlugInput';
 
 const FREE_UPLOAD_LIMIT = 5 * 1024 * 1024; // 5 MB
 
@@ -36,14 +36,6 @@ export default function Upload() {
     setSelectedFiles(files);
     setSelectedPaths(paths);
     setSelectedZip(null);
-  };
-
-  const handleSlugChange = (val: string) => {
-    const cleaned = val.toLowerCase().replace(/[^a-z0-9-]/g, '');
-    setSlug(cleaned);
-    if (cleaned && cleaned.length < 3) setSlugError('At least 3 characters');
-    else if (cleaned.length > 50) setSlugError('50 characters max');
-    else setSlugError('');
   };
 
   const hasSelection = selectedZip !== null || selectedFiles.length > 0;
@@ -117,7 +109,6 @@ export default function Upload() {
     }
   };
 
-  const previewSlug = slug || '(auto-generated)';
 
   return (
     <div className="min-h-screen bg-white pt-24 pb-16 px-6">
@@ -141,37 +132,11 @@ export default function Upload() {
             />
           </div>
 
-          {/* Custom URL Slug */}
-          <div className="mb-8">
-            <label className="text-sm font-medium text-slate-700 block mb-1.5">
-              Custom URL <span className="text-slate-400 font-normal">(optional)</span>
-            </label>
-            <div className="flex items-center border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent">
-              <span className="bg-slate-50 text-slate-400 text-sm px-4 py-3 border-r border-slate-200 whitespace-nowrap shrink-0">
-                https://
-              </span>
-              <input
-                type="text"
-                value={slug}
-                onChange={(e) => handleSlugChange(e.target.value)}
-                placeholder="my-project"
-                maxLength={50}
-                className="flex-1 px-3 py-3 text-sm focus:outline-none bg-white min-w-0"
-              />
-              <span className="bg-slate-50 text-slate-400 text-sm px-4 py-3 border-l border-slate-200 whitespace-nowrap shrink-0">
-                .{APP_DOMAIN}
-              </span>
-            </div>
-            {slugError ? (
-              <p className="text-xs text-red-500 mt-1.5">{slugError}</p>
-            ) : (
-              <p className="text-xs text-slate-400 mt-1.5">
-                Your site will be at{' '}
-                <span className="font-mono text-primary">https://{previewSlug}.{APP_DOMAIN}</span>
-                {' '}— lowercase letters, numbers, and hyphens only
-              </p>
-            )}
-          </div>
+          <SlugInput
+            value={slug}
+            error={slugError}
+            onChange={(v, err) => { setSlug(v); setSlugError(err); }}
+          />
 
           {/* File uploader */}
           <div className="mb-6">

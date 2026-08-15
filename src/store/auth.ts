@@ -10,6 +10,8 @@ interface User {
   status: string;
   email_verified: boolean;
   mfaEnabled: boolean;
+  githubUsername?: string;
+  githubAvatarUrl?: string;
   created_at: string;
 }
 

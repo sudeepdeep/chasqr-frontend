@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-toastify';
-import { Rocket, Plus, UploadCloud, Paintbrush, X, ArrowRight } from 'lucide-react';
+import { Rocket, Plus, UploadCloud, Paintbrush, FolderGit2, X, ArrowRight } from 'lucide-react';
 import { getMySitesAPI, deleteSiteAPI, toggleStatusAPI } from '../api/site.api';
 import { AuthStore } from '../store/auth';
 import SiteCard from '../components/SiteCard';
@@ -12,6 +12,13 @@ import SiteCard from '../components/SiteCard';
 function NewSiteModal({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
   const options = [
+    {
+      to: '/import/github',
+      icon: FolderGit2,
+      title: 'Import from GitHub',
+      desc: 'Connect a repository and deploy its built output — with automatic redeploys on every push.',
+      badge: 'New',
+    },
     {
       to: '/upload',
       icon: UploadCloud,
@@ -23,7 +30,6 @@ function NewSiteModal({ onClose }: { onClose: () => void }) {
       icon: Paintbrush,
       title: 'Build from scratch',
       desc: 'Start with a blank white page and design it visually — sections, columns, navbar & footer. No code.',
-      badge: 'New',
     },
   ];
 
@@ -40,7 +46,7 @@ function NewSiteModal({ onClose }: { onClose: () => void }) {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 24, scale: 0.98 }}
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 relative"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl p-6 relative"
       >
         <button
           onClick={onClose}
@@ -51,7 +57,7 @@ function NewSiteModal({ onClose }: { onClose: () => void }) {
         <h2 className="font-bebas text-3xl text-slate-900 mb-1">Start a New Site</h2>
         <p className="text-slate-500 text-sm mb-6">How do you want to build it?</p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {options.map((opt) => {
             const Icon = opt.icon;
             return (

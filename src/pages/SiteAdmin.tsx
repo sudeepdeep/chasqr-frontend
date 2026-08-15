@@ -10,6 +10,7 @@ import {
   Eye,
   FileCode,
   FileText,
+  FolderGit2,
   Globe,
   Headset,
   Inbox,
@@ -41,6 +42,7 @@ import AnalyticsChart from "../components/AnalyticsChart";
 import ColorEditor from "../components/ColorEditor";
 import ContentEditor from "../components/ContentEditor";
 import FaviconEditor from "../components/FaviconEditor";
+import GitSettings from "../components/GitSettings";
 import PaymentModal from "../components/PaymentModal";
 import ProLockedGate from "../components/ProLockedGate";
 import SEOEditor from "../components/SEOEditor";
@@ -78,6 +80,7 @@ type Section =
   | "url"
   | "domain"
   | "files"
+  | "git"
   | "editor"
   | "layout"
   | "colors"
@@ -96,6 +99,7 @@ const NAV_GROUPS: {
       { id: "url", label: "Site URL", icon: Link2 },
       { id: "domain", label: "Custom Domain", icon: Globe },
       { id: "files", label: "Update Files", icon: UploadCloud },
+      { id: "git", label: "GitHub", icon: FolderGit2 },
     ],
   },
   {
@@ -1023,6 +1027,11 @@ export default function SiteAdmin() {
                     )}
                   </button>
                 </div>
+              )}
+
+              {/* GitHub */}
+              {activeSection === "git" && siteId && (
+                <GitSettings siteId={siteId} site={site} onChange={setSite} />
               )}
 
               {activeSection === "files" && siteId && (
