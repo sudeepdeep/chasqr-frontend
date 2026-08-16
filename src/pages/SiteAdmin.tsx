@@ -17,22 +17,28 @@ import {
   LayoutTemplate,
   Link2,
   Palette,
+  Pause,
   Pencil,
+  Play,
+  Power,
   Rocket,
+  Trash2,
   UploadCloud,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { getPaymentInfoAPI } from "../api/payment.api";
 import {
   addElementAPI,
+  deleteSiteAPI,
   getSiteAPI,
   redeployFilesAPI,
   redeployZipAPI,
   removeCustomDomainAPI,
   setCustomDomainAPI,
+  toggleStatusAPI,
   updateContentAPI,
   updateElementsAPI,
   updateSlugAPI,
@@ -87,7 +93,8 @@ type Section =
   | "seo"
   | "analytics"
   | "submissions"
-  | "support";
+  | "support"
+  | "controls";
 
 const NAV_GROUPS: {
   label: string;
@@ -117,6 +124,10 @@ const NAV_GROUPS: {
     label: "Help",
     items: [{ id: "support", label: "Expert Help", icon: Headset }],
   },
+  {
+    label: "Danger zone",
+    items: [{ id: "controls", label: "Pause & Delete", icon: Power }],
+  },
 ];
 
 const VALID_SECTIONS = new Set<Section>(
@@ -126,6 +137,7 @@ const VALID_SECTIONS = new Set<Section>(
 export default function SiteAdmin() {
   const { siteId } = useParams<{ siteId: string }>();
   const { user } = AuthStore.useState();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [site, setSite] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -140,6 +152,50 @@ export default function SiteAdmin() {
   );
   const activeSectionRef = useRef(activeSection);
   const [unreadSupportCount, setUnreadSupportCount] = useState(0);
+  const [busyControl, setBusyControl] = useState(false);
+  const togglePause = async () => {
+    if (!siteId) return;
+    setBusyControl(true);
+    try {
+      const res = await toggleStatusAPI(siteId);
+      // Trust the server's new status rather than flipping locally — a failed
+      // toggle would otherwise leave the panel showing the wrong state.
+      const next = res.data?.data?.site?.status;
+      setSite((prev: any) => ({
+        ...prev,
+        status: next ?? (prev.status === "active" ? "inactive" : "active"),
+      }));
+      toast.success(next === "inactive" ? "Site paused" : "Site is live again");
+    } catch {
+      toast.error("Could not change the site status");
+    } finally {
+      setBusyControl(false);
+    }
+  };
+
+  const handleDeleteSite = async () => {
+    if (!siteId) return;
+    // Typing the name is deliberate friction: this drops files, submissions
+    // and analytics, and frees the URL for anyone else to take.
+    const typed = window.prompt(
+      `Deleting "${site?.name}" removes its files, form submissions and analytics, and frees its URL. This cannot be undone.\n\nType the site name to confirm:`,
+    );
+    if (typed === null) return;
+    if (typed.trim() !== site?.name?.trim()) {
+      toast.error("That didn't match the site name — nothing was deleted");
+      return;
+    }
+    setBusyControl(true);
+    try {
+      await deleteSiteAPI(siteId);
+      toast.success("Site deleted");
+      navigate("/dashboard");
+    } catch {
+      toast.error("Could not delete the site");
+      setBusyControl(false);
+    }
+  };
+
   const setActiveSection = (section: Section) => {
     setActiveSectionState(section);
     activeSectionRef.current = section;
@@ -1143,6 +1199,72 @@ export default function SiteAdmin() {
                 </div>
               )}
 
+              {/* Pause & delete */}
+              {activeSection === "controls" && (
+                <div>
+                  <h2 className="font-bebas text-2xl text-slate-900 mb-1">
+                    Pause &amp; Delete
+                  </h2>
+                  <p className="text-xs text-slate-500 mb-5">
+                    Take this site offline temporarily, or remove it for good.
+                  </p>
+
+                  <div className="border border-slate-200 rounded-xl p-5 mb-4">
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-sm text-slate-800 mb-1">
+                          {site.status === "active"
+                            ? "Pause this site"
+                            : "Resume this site"}
+                        </h3>
+                        <p className="text-xs text-slate-500 leading-relaxed max-w-md">
+                          {site.status === "active"
+                            ? "Visitors will see an “offline” page instead of your site. Your files, domain and settings are all kept, and resuming puts it straight back."
+                            : "This site is currently paused and not serving visitors. Resuming brings it back on the same URL."}
+                        </p>
+                      </div>
+                      <button
+                        onClick={togglePause}
+                        disabled={busyControl}
+                        className="shrink-0 inline-flex items-center gap-1.5 border border-slate-200 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg hover:border-slate-400 transition-colors disabled:opacity-60"
+                      >
+                        {site.status === "active" ? (
+                          <>
+                            <Pause size={14} /> Pause site
+                          </>
+                        ) : (
+                          <>
+                            <Play size={14} /> Resume site
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="border border-red-200 bg-red-50/40 rounded-xl p-5">
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-sm text-red-700 mb-1">
+                          Delete this site
+                        </h3>
+                        <p className="text-xs text-slate-600 leading-relaxed max-w-md">
+                          Removes the site, its files, submissions and analytics.
+                          The URL is freed for anyone to claim. This cannot be
+                          undone — pause it instead if you only want it offline.
+                        </p>
+                      </div>
+                      <button
+                        onClick={handleDeleteSite}
+                        disabled={busyControl}
+                        className="shrink-0 inline-flex items-center gap-1.5 bg-red-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60"
+                      >
+                        <Trash2 size={14} /> Delete site
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Form submissions */}
               {activeSection === "submissions" && siteId && currentPage && (
                 <div>
@@ -1156,6 +1278,7 @@ export default function SiteAdmin() {
                     siteId={siteId}
                     page={currentPage.filename}
                     forms={currentPage.forms}
+                    isPro={site.plan === "paid"}
                     onFormsChange={(updatedSite) => setSite(updatedSite)}
                   />
                 </div>

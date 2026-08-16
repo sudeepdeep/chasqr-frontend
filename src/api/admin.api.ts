@@ -13,4 +13,24 @@ export const getAdminSupportRequestsAPI = () => api.get('/api/admin/support-requ
 export const getAdminRequestMessagesAPI = (id: string) =>
   api.get(`/api/admin/support-requests/${id}/messages`);
 export const getAdminExpertsAPI = () => api.get('/api/admin/experts');
+
+export interface ExpertPayload {
+  name: string;
+  email: string;
+  /** Required on create; omit or leave blank on update to keep the current one. */
+  password?: string;
+  expertTitle?: string;
+  expertSkills?: string[];
+  expertBio?: string;
+  expertStatus?: 'available' | 'occupied' | 'offline';
+  status?: 'active' | 'suspended';
+}
+
+export const createExpertAPI = (data: ExpertPayload) =>
+  api.post('/api/admin/experts', data);
+export const updateExpertAPI = (userId: string, data: ExpertPayload) =>
+  api.put(`/api/admin/experts/${userId}`, data);
+/** Revokes expert access. The account itself is kept and demoted to 'user'. */
+export const removeExpertAPI = (userId: string) =>
+  api.delete(`/api/admin/experts/${userId}`);
 export const getAdminPaymentsAPI = () => api.get('/api/admin/payments');

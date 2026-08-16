@@ -1,16 +1,172 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
-import { BarChart2, Users, Globe, CheckCircle2, Eye, Trash2, Headset, Crown, Receipt, MessageSquare, X, ExternalLink } from 'lucide-react';
+import { BarChart2, Users, Globe, CheckCircle2, Eye, Trash2, Headset, Crown, Receipt, MessageSquare, X, ExternalLink, Plus, Pencil, UserMinus } from 'lucide-react';
 import { publicSiteUrl } from '../lib/siteUrl';
 import {
   getStatsAPI, getAllUsersAPI, getAllSitesAdminAPI,
   updateUserStatusAPI, updateUserRoleAPI, adminDeleteSiteAPI,
   getAdminSupportRequestsAPI, getAdminRequestMessagesAPI,
   getAdminExpertsAPI, getAdminPaymentsAPI,
+  createExpertAPI, updateExpertAPI, removeExpertAPI,
 } from '../api/admin.api';
 
 type Tab = 'stats' | 'users' | 'sites' | 'support' | 'experts' | 'payments';
+
+/**
+ * Create/edit form for an expert.
+ *
+ * `expert` null means create. On edit the password field is optional and an
+ * empty value leaves the existing password alone — the backend treats it the
+ * same way, so a blank box can never blank out someone's login.
+ */
+function ExpertForm({
+  expert,
+  onClose,
+  onSaved,
+}: {
+  expert: any | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const editing = !!expert;
+  const [form, setForm] = useState({
+    name: expert?.name ?? '',
+    email: expert?.email ?? '',
+    password: '',
+    expertTitle: expert?.expertTitle ?? '',
+    expertBio: expert?.expertBio ?? '',
+    expertSkills: (expert?.expertSkills ?? []).join(', '),
+    expertStatus: expert?.expertStatus ?? 'offline',
+    status: expert?.status ?? 'active',
+  });
+  const [saving, setSaving] = useState(false);
+
+  const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const payload = {
+        name: form.name,
+        email: form.email,
+        expertTitle: form.expertTitle,
+        expertBio: form.expertBio,
+        expertSkills: String(form.expertSkills)
+          .split(',')
+          .map((s: string) => s.trim())
+          .filter(Boolean),
+        expertStatus: form.expertStatus as 'available' | 'occupied' | 'offline',
+        status: form.status as 'active' | 'suspended',
+        ...(form.password ? { password: form.password } : {}),
+      };
+      if (editing) await updateExpertAPI(expert._id, payload);
+      else await createExpertAPI(payload);
+      toast.success(editing ? 'Expert updated' : 'Expert created');
+      onSaved();
+      onClose();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Could not save expert');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const field = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary';
+
+  return (
+    <div onClick={onClose} className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center px-4 py-8 overflow-y-auto">
+      <form
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={submit}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 relative"
+      >
+        <button type="button" onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+          <X size={18} />
+        </button>
+        <h2 className="font-bebas text-3xl text-slate-900 mb-1">{editing ? 'Edit Expert' : 'New Expert'}</h2>
+        <p className="text-slate-500 text-sm mb-5">
+          {editing ? 'Update this expert’s profile and availability.' : 'Creates a verified expert account they can sign in with.'}
+        </p>
+
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-slate-600 block mb-1">Name</label>
+              <input className={field} value={form.name} onChange={(e) => set('name', e.target.value)} required />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-600 block mb-1">Email</label>
+              <input type="email" className={field} value={form.email} onChange={(e) => set('email', e.target.value)} required />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-slate-600 block mb-1">
+              Password {editing && <span className="text-slate-400 font-normal">— leave blank to keep current</span>}
+            </label>
+            <input
+              type="password"
+              className={field}
+              value={form.password}
+              onChange={(e) => set('password', e.target.value)}
+              minLength={8}
+              required={!editing}
+              placeholder={editing ? '••••••••' : 'At least 8 characters'}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-slate-600 block mb-1">Title</label>
+            <input className={field} value={form.expertTitle} onChange={(e) => set('expertTitle', e.target.value)} placeholder="React &amp; Angular Developer" />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-slate-600 block mb-1">Skills <span className="text-slate-400 font-normal">— comma separated</span></label>
+            <input className={field} value={form.expertSkills} onChange={(e) => set('expertSkills', e.target.value)} placeholder="react, angular, frontend" />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-slate-600 block mb-1">Bio</label>
+            <textarea className={`${field} resize-none`} rows={3} value={form.expertBio} onChange={(e) => set('expertBio', e.target.value)} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-slate-600 block mb-1">Availability</label>
+              <select className={field} value={form.expertStatus} onChange={(e) => set('expertStatus', e.target.value)}>
+                <option value="available">available</option>
+                <option value="occupied">occupied</option>
+                <option value="offline">offline</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-600 block mb-1">Account</label>
+              <select className={field} value={form.status} onChange={(e) => set('status', e.target.value)}>
+                <option value="active">active</option>
+                <option value="suspended">suspended</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 mt-6">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="bg-primary text-white text-sm font-medium px-5 py-2 rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-60"
+          >
+            {saving ? 'Saving…' : editing ? 'Save changes' : 'Create expert'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
 
 export default function AdminPanel() {
   const [tab, setTab] = useState<Tab>('stats');
@@ -21,6 +177,7 @@ export default function AdminPanel() {
   const [experts, setExperts] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [chatView, setChatView] = useState<{ id: string; messages: any[] } | null>(null);
+  const [expertForm, setExpertForm] = useState<{ open: boolean; expert: any | null }>({ open: false, expert: null });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => { loadTab(tab); }, [tab]); // eslint-disable-line
@@ -36,6 +193,21 @@ export default function AdminPanel() {
       else { const r = await getAdminPaymentsAPI(); setPayments(r.data.data.payments); }
     } catch { toast.error('Failed to load data'); }
     finally { setLoading(false); }
+  };
+
+  const removeExpert = async (expert: any) => {
+    // Spelled out because it isn't a delete: the account survives, which is
+    // what keeps their past support conversations readable.
+    if (!window.confirm(
+      `Revoke expert access for ${expert.name}?\n\nThe account is kept (demoted to a normal user) so their support history stays intact. You can promote them again from the Users tab.`
+    )) return;
+    try {
+      await removeExpertAPI(expert._id);
+      setExperts((prev) => prev.filter((x) => x._id !== expert._id));
+      toast.success('Expert access revoked');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Could not revoke access');
+    }
   };
 
   const openChat = async (id: string) => {
@@ -256,11 +428,20 @@ export default function AdminPanel() {
 
               {tab === 'experts' && (
                 <div className="overflow-x-auto">
+                  <div className="flex justify-end mb-4">
+                    <button
+                      onClick={() => setExpertForm({ open: true, expert: null })}
+                      className="inline-flex items-center gap-1.5 bg-primary text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors"
+                    >
+                      <Plus size={15} />
+                      New expert
+                    </button>
+                  </div>
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-slate-200">
-                        {['Name', 'Email', 'Title', 'Skills', 'Availability', 'Account'].map(h => (
-                          <th key={h} className="text-left py-3 px-2 text-slate-500 font-medium">{h}</th>
+                        {['Name', 'Email', 'Title', 'Skills', 'Availability', 'Account', ''].map((h, i) => (
+                          <th key={h || i} className="text-left py-3 px-2 text-slate-500 font-medium">{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -279,12 +460,30 @@ export default function AdminPanel() {
                             }`}>{e.expertStatus}</span>
                           </td>
                           <td className="py-3 px-2 text-slate-500">{e.status}</td>
+                          <td className="py-3 px-2">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => setExpertForm({ open: true, expert: e })}
+                                title="Edit expert"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-primary hover:bg-primary-light transition-colors"
+                              >
+                                <Pencil size={15} />
+                              </button>
+                              <button
+                                onClick={() => removeExpert(e)}
+                                title="Revoke expert access"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                              >
+                                <UserMinus size={15} />
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                   {experts.length === 0 && (
-                    <p className="text-center text-slate-400 text-sm py-10">No experts yet — promote a user or run the seed script</p>
+                    <p className="text-center text-slate-400 text-sm py-10">No experts yet — create one above, or promote a user from the Users tab</p>
                   )}
                 </div>
               )}
@@ -317,6 +516,14 @@ export default function AdminPanel() {
                 </div>
               )}
             </>
+          )}
+
+          {expertForm.open && (
+            <ExpertForm
+              expert={expertForm.expert}
+              onClose={() => setExpertForm({ open: false, expert: null })}
+              onSaved={() => loadTab('experts')}
+            />
           )}
 
           {/* Chat oversight modal */}

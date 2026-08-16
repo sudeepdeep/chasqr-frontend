@@ -69,6 +69,7 @@ import {
   DollarSign,
   Copy,
 } from "lucide-react";
+import ShaderCanvas from "./ShaderCanvas";
 import StyleToolbar from "./StyleToolbar";
 import { updateLayoutAPI, uploadAssetAPI } from "../api/site.api";
 
@@ -187,6 +188,8 @@ interface Section {
   bgImage?: string;
   overlay?: string;
   minH?: number;
+  /** Animated WebGL background preset painted behind the content. */
+  shader?: string;
   shadow?: boolean;
   font?: string;
   anim?: Anim;
@@ -318,7 +321,15 @@ const emptyFooter = (): FooterConfig => ({
 // Live preview of a section's background/effect settings (mirrors the renderer).
 function sectionPreviewStyle(sec: Section): React.CSSProperties {
   const s: React.CSSProperties = {};
-  if (sec.bgImage) {
+  if (sec.shader) {
+    // Same fallback gradient the renderer puts on .cq-shader-wrap, so the
+    // section reads correctly before (or without) the canvas painting.
+    s.background =
+      "radial-gradient(120% 90% at 50% 40%, #1d4ed8 0%, #1e3a8a 45%, #020617 100%)";
+    s.color = "#fff";
+    s.position = "relative";
+    s.overflow = "hidden";
+  } else if (sec.bgImage) {
     // Hero: overlay gradient layered over the image (uploaded site-relative
     // paths won't resolve in the builder, but pasted URLs preview correctly).
     const ov = sec.overlay || "rgba(15,23,42,0.55)";
@@ -488,6 +499,7 @@ function newSection(cols = 1): Section {
 // Section presets ("banner" / composite blocks) inserted from the palette.
 type PresetKind =
   | "image-banner"
+  | "shader-banner"
   | "text-over-image"
   | "carousel"
   | "image-text"
@@ -814,6 +826,41 @@ function newPreset(kind: PresetKind): Section {
   }
   if (kind === "image-banner") {
     return { id: uid(), full: true, columns: [col(12, [newBlock("image")])] };
+  }
+  // Animated banner — the same moving gradient as the Chasqr landing page.
+  // Every text block is a normal block, so it stays fully editable.
+  if (kind === "shader-banner") {
+    const heading: Block = {
+      id: uid(),
+      type: "heading",
+      text: "Your headline goes here",
+      align: "center",
+      style: "color: #ffffff; font-size: 3.25rem; line-height: 1.1",
+    };
+    const text: Block = {
+      id: uid(),
+      type: "text",
+      text: "A short supporting line. Click any text here to edit it.",
+      align: "center",
+      style: "color: rgba(255,255,255,0.72); font-size: 1.05rem",
+    };
+    const btn: Block = {
+      id: uid(),
+      type: "button",
+      text: "Get started",
+      href: "#",
+      align: "center",
+      style: "background: #ffffff; color: #0f172a",
+    };
+    return {
+      id: uid(),
+      full: true,
+      minH: 520,
+      vAlign: "center",
+      padY: 72,
+      shader: "aurora",
+      columns: [col(12, [heading, text, btn])],
+    };
   }
   if (kind === "text-over-image") {
     const heading: Block = {
@@ -1757,6 +1804,16 @@ export default function LayoutBuilder({
             )}
 
             <div style={sectionPreviewStyle(section)}>
+              {section.shader && (
+                <ShaderCanvas
+                  preset={section.shader}
+                  className="absolute inset-0 w-full h-full pointer-events-none"
+                />
+              )}
+              {/* The canvas is absolutely positioned, so it paints above any
+                  static sibling. The row has to be lifted out of its way or
+                  the whole section becomes unclickable behind the shader. */}
+              <div className={section.shader ? "relative z-10" : undefined}>
               <SectionRow
                 section={section}
                 device={device}
@@ -1774,6 +1831,7 @@ export default function LayoutBuilder({
                 onRemoveBlock={removeBlock}
                 siteId={siteId}
               />
+              </div>
             </div>
           </motion.div>
         ))}
@@ -4987,6 +5045,7 @@ function BuilderPalette({
   const presets: [PresetKind, any, string][] = [
     ["nav-simple", Menu, "Navbar"],
     ["nav-search", Search, "Navbar + search"],
+    ["shader-banner", Sparkles, "Animated banner"],
     ["text-over-image", ImagePlus, "Text over image"],
     ["image-banner", ImageIcon, "Image banner"],
     ["carousel", GalleryHorizontal, "Carousel slider"],

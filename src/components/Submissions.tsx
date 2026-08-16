@@ -42,10 +42,12 @@ interface Props {
   siteId: string;
   page?: string;
   forms?: DetectedForm[];
+  /** Email notification of new submissions is a PRO feature. */
+  isPro?: boolean;
   onFormsChange?: (site: any) => void;
 }
 
-export default function Submissions({ siteId, page, forms, onFormsChange }: Props) {
+export default function Submissions({ siteId, page, forms, isPro, onFormsChange }: Props) {
   const [items, setItems] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -161,14 +163,32 @@ export default function Submissions({ siteId, page, forms, onFormsChange }: Prop
         </div>
       )}
 
+      {/* Say plainly that email delivery is PRO. Silently not sending would
+          read as a broken feature, and the support ticket it generates costs
+          more than the email would have. */}
+      {!isPro && (
+        <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <Mail size={15} className="text-slate-400 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <p className="text-sm text-slate-700">
+              Submissions are saved here on every plan.{" "}
+              <span className="font-medium text-slate-900">
+                Upgrade to Pro to also get them emailed to you
+              </span>{" "}
+              the moment they arrive.
+            </p>
+          </div>
+        </div>
+      )}
+
       {items.length === 0 ? (
         <div className="text-center py-16 border-2 border-dashed border-slate-200 rounded-2xl">
           <Inbox size={36} className="text-slate-300 mx-auto mb-3" />
           <p className="text-slate-500 text-sm">No form submissions yet.</p>
           <p className="text-slate-400 text-xs mt-1">
             {forms && forms.length > 0
-              ? "Connect a form above, or add a Form block in the Layout tab — messages will appear here and land in your email."
-              : "Add a Form block in the Layout tab, or connect your own form (see the setup guide above) — messages will appear here and land in your email."}
+              ? `Connect a form above, or add a Form block in the Layout tab — messages will appear here${isPro ? " and land in your email" : ""}.`
+              : `Add a Form block in the Layout tab, or connect your own form (see the setup guide above) — messages will appear here${isPro ? " and land in your email" : ""}.`}
           </p>
         </div>
       ) : (

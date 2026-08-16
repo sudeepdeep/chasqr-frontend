@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { cn } from "../../lib/utils";
 
-const vertexShaderGLSL = `
+export const vertexShaderGLSL = `
 attribute vec2 position;
 varying vec2 vUv;
 void main() {
@@ -12,7 +12,7 @@ void main() {
 }
 `;
 
-const fragmentShaderGLSL = `
+export const fragmentShaderGLSL = `
 precision highp float;
 varying vec2 vUv;
 
