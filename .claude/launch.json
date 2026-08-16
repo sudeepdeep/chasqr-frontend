@@ -3,9 +3,9 @@
   "configurations": [
     {
       "name": "chasqr-frontend",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["serve", "-s", "build", "-l", "4173"],
-      "port": 4173
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["start"],
+      "port": 3000
     }
   ]
 }

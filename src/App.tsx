@@ -1,30 +1,31 @@
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-import AppLayout from './layout/AppLayout';
-import Landing from './pages/Landing';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import GithubCallback from './pages/GithubCallback';
-import Docs from './pages/Docs';
-import SeoChecker from './pages/SeoChecker';
-import Terms from './pages/Terms';
-import Privacy from './pages/Privacy';
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
-import Dashboard from './pages/Dashboard';
-import Profile from './pages/Profile';
-import Upload from './pages/Upload';
-import Build from './pages/Build';
-import ImportGithub from './pages/ImportGithub';
-import Builder from './pages/Builder';
-import SiteAdmin from './pages/SiteAdmin';
-import AdminPanel from './pages/AdminPanel';
-import Transactions from './pages/Transactions';
-import ExpertPanel from './pages/ExpertPanel';
 import ProtectedRoute from './components/ProtectedRoute';
+import AppLayout from './layout/AppLayout';
+import AdminPanel from './pages/AdminPanel';
+import Analytics from './pages/Analytics';
+import Build from './pages/Build';
+import Builder from './pages/Builder';
+import Dashboard from './pages/Dashboard';
+import Docs from './pages/Docs';
+import ExpertPanel from './pages/ExpertPanel';
+import ForgotPassword from './pages/ForgotPassword';
+import GithubCallback from './pages/GithubCallback';
+import ImportGithub from './pages/ImportGithub';
+import LandingV2 from './pages/LandingV2';
+import Login from './pages/Login';
+import Privacy from './pages/Privacy';
+import Profile from './pages/Profile';
+import Register from './pages/Register';
+import ResetPassword from './pages/ResetPassword';
+import SeoChecker from './pages/SeoChecker';
+import SiteAdmin from './pages/SiteAdmin';
+import Terms from './pages/Terms';
+import Transactions from './pages/Transactions';
+import Upload from './pages/Upload';
 
 const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
@@ -40,7 +41,10 @@ const router = createBrowserRouter([
     path: '/',
     element: <AppLayout />,
     children: [
-      { path: '/', element: <Landing /> },
+      { path: '/', element: <LandingV2 /> },
+      // Alternate landing page, live alongside the current one while we pick.
+      // { path: '/v2', element: <LandingV2 /> },
+      // { path: '/v3', element: <LandingV3 /> },
       { path: '/docs', element: <Docs /> },
       { path: '/seo-checker', element: <SeoChecker /> },
       { path: '/terms', element: <Terms /> },
@@ -50,6 +54,10 @@ const router = createBrowserRouter([
       {
         path: '/dashboard',
         element: <ProtectedRoute><Dashboard /></ProtectedRoute>,
+      },
+      {
+        path: '/analytics',
+        element: <ProtectedRoute><Analytics /></ProtectedRoute>,
       },
       {
         path: '/profile',

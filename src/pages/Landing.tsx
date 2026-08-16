@@ -20,8 +20,11 @@ import {
   RefreshCw,
   CreditCard,
   ShieldAlert,
+  Rocket,
 } from "lucide-react";
 import { AuthStore } from "../store/auth";
+import HeroOrbit from "../components/HeroOrbit";
+import HeroPulse from "../components/HeroPulse";
 import StorageNoticeBanner from "../components/StorageNoticeBanner";
 
 const features = [
@@ -151,8 +154,24 @@ function MediaSlot({
   );
 }
 
+/**
+ * Which hero graphic to show. Two are built while we decide:
+ *   "orbit" — features circling the mark
+ *   "pulse" — features wired into the mark, energy running down the lines
+ *
+ * Override live with ?hero=orbit / ?hero=pulse to compare without rebuilding.
+ * Once one is picked, delete the loser and this switch.
+ */
+const DEFAULT_HERO: "orbit" | "pulse" = "pulse";
+
 export default function Landing() {
   const { user } = AuthStore.useState();
+
+  const heroParam =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("hero")
+      : null;
+  const hero = heroParam === "pulse" || heroParam === "orbit" ? heroParam : DEFAULT_HERO;
 
   const primaryCTA = user
     ? { to: "/upload", label: "Deploy a New Site" }
@@ -169,97 +188,101 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-white overflow-x-clip">
       {/* Hero */}
-      <section className="relative pt-36 pb-20 px-6 text-center max-w-5xl mx-auto">
-        {/* Ambient gradient blobs */}
-        <div className="absolute -top-24 -left-32 w-[28rem] h-[28rem] bg-primary/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute top-40 -right-32 w-[24rem] h-[24rem] bg-sky-300/30 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-1/3 w-[20rem] h-[20rem] bg-indigo-200/40 rounded-full blur-3xl pointer-events-none" />
+      <section className="relative overflow-hidden pt-32 pb-20 lg:pt-36 lg:pb-28 px-6">
+        {/* Drifting graph-paper grid, faded out at the edges */}
+        <div
+          className="absolute inset-0 hero-grid animate-grid-drift pointer-events-none"
+          style={{
+            maskImage:
+              "radial-gradient(ellipse 80% 60% at 50% 40%, black, transparent)",
+            WebkitMaskImage:
+              "radial-gradient(ellipse 80% 60% at 50% 40%, black, transparent)",
+          }}
+        />
+        {/* Ambient gradient blobs, slowly breathing */}
+        <div className="absolute -top-32 -left-40 w-[32rem] h-[32rem] bg-primary/20 rounded-full blur-3xl pointer-events-none animate-blob" />
+        <div
+          className="absolute top-20 -right-40 w-[30rem] h-[30rem] bg-sky-300/30 rounded-full blur-3xl pointer-events-none animate-blob"
+          style={{ animationDelay: "-6s" }}
+        />
+        <div
+          className="absolute -bottom-24 left-1/3 w-[26rem] h-[26rem] bg-indigo-200/40 rounded-full blur-3xl pointer-events-none animate-blob"
+          style={{ animationDelay: "-12s" }}
+        />
 
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6 }}
-          className="relative"
-        >
-          <Link
-            to="/seo-checker"
-            className="inline-flex items-center gap-1.5 bg-white/60 backdrop-blur-md text-primary text-xs font-semibold px-4 py-1.5 rounded-full mb-8 tracking-wide uppercase border border-primary/20 shadow-sm hover:bg-white transition-colors"
+        <div className="relative max-w-6xl mx-auto flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
+          {/* Copy */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="flex-1 text-center lg:text-left"
           >
-            <Sparkles size={12} />
-            New — Try the free SEO checker
-          </Link>
-
-          <h1 className="font-bebas text-7xl md:text-9xl text-slate-900 leading-none mb-6">
-            Deploy Your
-            <br />
-            <span className="bg-gradient-to-r from-primary via-blue-500 to-sky-400 bg-clip-text text-transparent">
-              Website
-            </span>
-            <br />
-            In Seconds
-          </h1>
-
-          <p className="text-lg text-slate-500 max-w-xl mx-auto mb-10 leading-relaxed">
-            Upload your HTML, CSS, and assets. Get a shareable link instantly.
-            Connect your own domain, edit content, tune SEO — without touching
-            code ever again.
-          </p>
-
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              to={primaryCTA.to}
-              className="group flex items-center justify-center gap-2 bg-primary text-white font-semibold px-8 py-4 rounded-xl hover:bg-primary-dark transition-all hover:scale-105 text-base shadow-lg shadow-primary/25"
+              to="/seo-checker"
+              className="inline-flex items-center gap-1.5 bg-white/60 backdrop-blur-md text-primary text-xs font-semibold px-4 py-1.5 rounded-full mb-7 tracking-wide uppercase border border-primary/20 shadow-sm hover:bg-white transition-colors"
             >
-              {primaryCTA.label}
-              <ArrowRight
-                size={16}
-                className="transition-transform group-hover:translate-x-1"
-              />
+              <Sparkles size={12} />
+              New — Try the free SEO checker
             </Link>
-            <Link
-              to={secondaryCTA.to}
-              className="border border-slate-200 bg-white/60 backdrop-blur-md text-slate-700 font-semibold px-8 py-4 rounded-xl hover:bg-white transition-all text-base"
-            >
-              {secondaryCTA.label}
-            </Link>
-          </div>
-        </motion.div>
 
-        {/* Mock URL bar */}
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4, duration: 0.6 }}
-          className="relative mt-16 bg-slate-900/90 backdrop-blur-xl rounded-2xl p-4 max-w-lg mx-auto shadow-2xl border border-white/10"
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-3 h-3 rounded-full bg-red-400" />
-            <div className="w-3 h-3 rounded-full bg-yellow-400" />
-            <div className="w-3 h-3 rounded-full bg-green-400" />
-            <span className="ml-auto flex items-center gap-1 text-xs text-emerald-400">
-              <Lock size={10} /> https
-            </span>
-          </div>
-          <div className="bg-slate-800/80 rounded-lg px-4 py-2.5 text-left">
-            <span className="text-slate-500 text-sm">yourdomain.com</span>
-            <motion.span
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 1, duration: 0.5 }}
-              className="text-accent text-sm font-mono"
-            >
-              /
-            </motion.span>
-            <motion.span
-              initial={{ opacity: 0 }}
-              animate={{ opacity: [0, 1, 0] }}
-              transition={{ delay: 1, duration: 0.8, repeat: Infinity }}
-              className="text-white text-sm"
-            >
-              |
-            </motion.span>
-          </div>
-        </motion.div>
+            <h1 className="font-bebas text-4xl sm:text-5xl lg:text-6xl text-slate-900 leading-[1.02] mb-5">
+              Deploy Your{" "}
+              <span className="bg-gradient-to-r from-primary via-blue-500 to-sky-400 bg-clip-text text-transparent">
+                Website
+              </span>
+              <br />
+              In Seconds
+            </h1>
+
+            <p className="text-base sm:text-lg text-slate-500 max-w-xl mx-auto lg:mx-0 mb-8 leading-relaxed">
+              Push to GitHub, upload a folder, or build it visually — your site
+              goes live instantly with a custom domain, free HTTPS, SEO tools and
+              contact forms. No code, no servers, no monthly bill.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-3.5 justify-center lg:justify-start">
+              <Link
+                to={primaryCTA.to}
+                className="group flex items-center justify-center gap-2 bg-primary text-white font-semibold px-7 py-3.5 rounded-xl hover:bg-primary-dark transition-all hover:scale-105 text-base shadow-lg shadow-primary/25"
+              >
+                {primaryCTA.label}
+                <ArrowRight
+                  size={16}
+                  className="transition-transform group-hover:translate-x-1"
+                />
+              </Link>
+              <Link
+                to={secondaryCTA.to}
+                className="border border-slate-200 bg-white/60 backdrop-blur-md text-slate-700 font-semibold px-7 py-3.5 rounded-xl hover:bg-white transition-all text-base text-center"
+              >
+                {secondaryCTA.label}
+              </Link>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 justify-center lg:justify-start mt-7 text-xs text-slate-400">
+              <span className="flex items-center gap-1.5">
+                <Lock size={11} className="text-emerald-500" /> Free HTTPS
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Globe size={11} className="text-emerald-500" /> Custom domains
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Rocket size={11} className="text-emerald-500" /> Deploy on push
+              </span>
+            </div>
+          </motion.div>
+
+          {/* Orbit */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.8, delay: 0.15 }}
+            className="flex-1 flex justify-center lg:justify-end"
+          >
+            {hero === "pulse" ? <HeroPulse /> : <HeroOrbit />}
+          </motion.div>
+        </div>
       </section>
 
       {/* Trust bar */}

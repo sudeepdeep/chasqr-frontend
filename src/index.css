@@ -38,3 +38,117 @@
     letter-spacing: 0.02em;
   }
 }
+
+/* ─── Hero orbit ────────────────────────────────────────────────────────────
+   The ring spins while each badge counter-spins at the same rate, so the
+   icons orbit the logo without ever tipping over. Both must share a duration.
+──────────────────────────────────────────────────────────────────────────── */
+@keyframes orbit-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes orbit-spin-counter {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(-360deg); }
+}
+/* Slow drift of the graph-paper grid behind the hero. */
+@keyframes grid-drift {
+  from { background-position: 0 0; }
+  to   { background-position: 72px 72px; }
+}
+/* Ambient blobs breathing behind everything. */
+@keyframes blob-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  33%      { transform: translate3d(3%, -4%, 0) scale(1.08); }
+  66%      { transform: translate3d(-3%, 3%, 0) scale(0.95); }
+}
+
+/* ─── Thunder ───────────────────────────────────────────────────────────────
+   Mostly dark with two quick double-strikes, the way real lightning reads —
+   a steady pulse would look like a breathing lamp instead.
+──────────────────────────────────────────────────────────────────────────── */
+@keyframes thunder-strike {
+  0%, 100% { opacity: 0.13; }   /* always faintly there, so it's not a blank gap */
+  4%       { opacity: 0.75; }   /* first strike */
+  7%       { opacity: 0.26; }
+  10%      { opacity: 0.66; }   /* ...and its echo */
+  15%      { opacity: 0.14; }
+  45%      { opacity: 0.62; }   /* second strike, weaker */
+  48%      { opacity: 0.22; }
+  52%      { opacity: 0.52; }
+  57%      { opacity: 0.13; }
+}
+/* The glow behind the bolt, swelling with each strike. */
+@keyframes thunder-glow {
+  0%, 100% { opacity: 0.18; transform: scale(1); }
+  4%       { opacity: 0.80; transform: scale(1.07); }
+  10%      { opacity: 0.62; transform: scale(1.05); }
+  16%      { opacity: 0.20; transform: scale(1); }
+  45%      { opacity: 0.62; transform: scale(1.05); }
+  52%      { opacity: 0.50; transform: scale(1.03); }
+  58%      { opacity: 0.18; transform: scale(1); }
+}
+/* Chips drifting so the layout never looks pinned. */
+@keyframes float-soft {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-9px); }
+}
+/* Energy travelling along the connector lines, into the logo. */
+@keyframes dash-flow {
+  from { stroke-dashoffset: 0; }
+  to   { stroke-dashoffset: -28; }
+}
+/* ─── Feature network beams ─────────────────────────────────────────────────
+   One short dash per connector, running from the outer node into the centre.
+   Every path carries pathLength="100", which normalises lines of completely
+   different lengths onto the same 0–100 scale — so a single keyframe drives
+   them all at a matching speed instead of the short lines finishing first.
+   The dash starts fully before the path and ends fully past it, so it enters
+   and leaves cleanly rather than popping in at the node.
+──────────────────────────────────────────────────────────────────────────── */
+@keyframes beam-flow {
+  from { stroke-dashoffset: 14; }
+  to   { stroke-dashoffset: -100; }
+}
+/* Halo expanding out of the centre mark. */
+@keyframes halo-out {
+  0%   { transform: scale(0.75); opacity: 0.5; }
+  70%  { opacity: 0; }
+  100% { transform: scale(1.65); opacity: 0; }
+}
+
+@layer utilities {
+  .animate-orbit         { animation: orbit-spin 40s linear infinite; }
+  .animate-orbit-counter { animation: orbit-spin-counter 40s linear infinite; }
+  .animate-grid-drift    { animation: grid-drift 8s linear infinite; }
+  .animate-blob          { animation: blob-drift 18s ease-in-out infinite; }
+  .animate-thunder       { animation: thunder-strike 7s ease-in-out infinite; }
+  .animate-thunder-glow  { animation: thunder-glow 7s ease-in-out infinite; }
+  .animate-float-soft    { animation: float-soft 6s ease-in-out infinite; }
+  .animate-dash-flow     { animation: dash-flow 1.4s linear infinite; }
+  .animate-beam-flow     { animation: beam-flow 2.8s linear infinite; }
+  .animate-halo          { animation: halo-out 3.4s ease-out infinite; }
+
+  .hero-grid {
+    background-image:
+      linear-gradient(to right, rgb(148 163 184 / 0.13) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(148 163 184 / 0.13) 1px, transparent 1px);
+    background-size: 72px 72px;
+  }
+}
+
+/* Anyone who has asked their OS for less motion gets a still hero. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-orbit,
+  .animate-orbit-counter,
+  .animate-grid-drift,
+  .animate-blob,
+  .animate-thunder,
+  .animate-thunder-glow,
+  .animate-float-soft,
+  .animate-dash-flow,
+  .animate-beam-flow,
+  .animate-halo {
+    animation: none !important;
+  }
+}

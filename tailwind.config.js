@@ -11,6 +11,7 @@ module.exports = {
       fontFamily: {
         bebas: ["Bebas Neue", "sans-serif"],
         inter: ["Inter", "sans-serif"],
+        poppins: ["Poppins", "Inter", "sans-serif"],
       },
       colors: {
         primary: {

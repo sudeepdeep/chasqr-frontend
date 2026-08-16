@@ -17,6 +17,7 @@ import {
   Link2,
   LifeBuoy,
   Mail,
+  Maximize2,
   MessageCircle,
   Palette,
   Paintbrush,
@@ -29,6 +30,7 @@ import {
 } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import ImageLightbox from "../components/ImageLightbox";
 
 const API_URL = process.env.REACT_APP_API_URL || "https://api.chasqr.com";
 const APP_DOMAIN = process.env.REACT_APP_APP_DOMAIN || "chasqr.com";
@@ -392,6 +394,8 @@ function Shot({
   alt: string;
   pending?: boolean;
 }) {
+  const [open, setOpen] = useState(false);
+
   if (pending) {
     return (
       <div className="flex items-center gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-xs text-slate-400">
@@ -401,17 +405,48 @@ function Shot({
     );
   }
 
+  const src = `${process.env.PUBLIC_URL || ""}/images/doc-${n}.png`;
+
   return (
     <figure className="my-1">
-      <img
-        src={`${process.env.PUBLIC_URL || ""}/images/doc-${n}.png`}
-        alt={alt}
-        loading="lazy"
-        className="w-full rounded-xl border border-slate-200 shadow-sm bg-white"
-      />
+      {/* Dark window chrome for the same reason as the landing page: these are
+          screenshots of a white UI, and on a white page they otherwise have no
+          edge at all. */}
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label={`Enlarge screenshot: ${alt}`}
+        className="group relative block w-full cursor-zoom-in overflow-hidden rounded-xl bg-[#1d1f21] text-left shadow-sm ring-1 ring-slate-900/10"
+      >
+        <div className="flex items-center gap-1.5 border-b border-black/40 bg-[#2c2f31] px-3 h-8">
+          <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
+          <span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" />
+          <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
+        </div>
+
+        <img src={src} alt={alt} loading="lazy" className="w-full bg-white" />
+
+        <span className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-1.5 rounded-md bg-slate-900/85 px-2.5 py-1.5 text-[11px] font-medium text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+          <Maximize2 size={12} />
+          Click to enlarge
+        </span>
+      </button>
+
       <figcaption className="text-xs text-slate-400 mt-2 leading-relaxed">
         {alt}
       </figcaption>
+
+      {/* Each Shot carries its own viewer rather than the page owning one:
+          Shot is used deep inside the article body in ~17 places, and threading
+          a callback down to every one of them would touch far more of this
+          file than the feature is worth. Only one can be open at a time in
+          practice, and the viewer portals to <body> regardless. */}
+      <ImageLightbox
+        src={open ? src : null}
+        alt={alt}
+        caption={alt}
+        onClose={() => setOpen(false)}
+      />
     </figure>
   );
 }
