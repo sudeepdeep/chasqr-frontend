@@ -89,8 +89,11 @@ export default function Navbar() {
       }`}
     >
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+        {/* Signed in, the logo is a shortcut home to the dashboard. The `/`
+            route would redirect there anyway, but pointing straight at it
+            avoids a pointless extra navigation on every click. */}
         <Link
-          to="/"
+          to={user ? '/dashboard' : '/'}
           className={`flex items-center gap-2 font-bebas text-2xl tracking-widest transition-colors ${
             overlay ? 'text-white' : 'text-primary'
           }`}

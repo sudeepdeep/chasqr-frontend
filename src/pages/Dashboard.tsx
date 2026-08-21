@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-toastify';
-import { Rocket, Plus, UploadCloud, Paintbrush, FolderGit2, X, ArrowRight } from 'lucide-react';
-import { getMySitesAPI, deleteSiteAPI, toggleStatusAPI } from '../api/site.api';
+import { Rocket, Plus, Search, UploadCloud, Paintbrush, FolderGit2, X, ArrowRight } from 'lucide-react';
 import { AuthStore } from '../store/auth';
-import SiteCard from '../components/SiteCard';
+import SiteGridCard, { DashSite } from '../components/SiteGridCard';
+import { useSites, useSiteMutations } from '../queries/sites';
 
 // Two-option chooser shown when starting a new site: deploy existing code, or
 // build a fresh page in the visual layout tool.
@@ -92,67 +92,169 @@ function NewSiteModal({ onClose }: { onClose: () => void }) {
 
 export default function Dashboard() {
   const { user } = AuthStore.useState();
-  const [sites, setSites] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [newSiteOpen, setNewSiteOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<'All' | 'Live' | 'Paused'>('All');
+  const [sort, setSort] = useState<'deployed' | 'visits' | 'name'>('deployed');
+
+  // Served from the shared cache. Coming back to this page inside the stale
+  // window paints immediately with no request and no loading state.
+  const { data, isPending, isError } = useSites();
+  const sites = (data ?? []) as DashSite[];
+  const loading = isPending;
+
+  const { rename, toggle, remove } = useSiteMutations();
 
   useEffect(() => {
-    getMySitesAPI()
-      .then((res) => setSites(res.data.data.sites))
-      .catch(() => toast.error('Failed to load sites'))
-      .finally(() => setLoading(false));
-  }, []);
+    if (isError) toast.error('Failed to load sites');
+  }, [isError]);
 
-  const handleDelete = async (siteId: string) => {
-    if (!window.confirm('Delete this site? This cannot be undone.')) return;
-    try {
-      await deleteSiteAPI(siteId);
-      setSites((prev) => prev.filter((s) => s.siteId !== siteId));
-      toast.success('Site deleted');
-    } catch {
-      toast.error('Failed to delete site');
-    }
+  const handleDelete = (site: DashSite) => {
+    if (
+      !window.confirm(
+        `Delete "${site.name}"? Its files, form submissions and analytics go with it, and the URL is freed for anyone to claim. This cannot be undone.`,
+      )
+    ) return;
+    remove.mutate(site.siteId, {
+      onSuccess: () => toast.success('Site deleted'),
+      onError: () => toast.error('Failed to delete site'),
+    });
   };
 
-  const handleRename = (siteId: string, newName: string) => {
-    setSites((prev) => prev.map((s) => (s.siteId === siteId ? { ...s, name: newName } : s)));
+  const handleRename = (site: DashSite) => {
+    const next = window.prompt('Rename site', site.name);
+    if (next === null) return;
+    const name = next.trim();
+    if (!name || name === site.name) return;
+    rename.mutate(
+      { siteId: site.siteId, name },
+      {
+        onSuccess: () => toast.success('Site renamed'),
+        onError: () => toast.error('Failed to rename site'),
+      },
+    );
   };
 
-  const handleToggle = async (siteId: string) => {
-    try {
-      const res = await toggleStatusAPI(siteId);
-      const updated = res.data.data.site;
-      setSites((prev) => prev.map((s) => (s.siteId === siteId ? updated : s)));
-      toast.success(res.data.message);
-    } catch {
-      toast.error('Failed to update site status');
-    }
+  const handleToggle = (site: DashSite) => {
+    toggle.mutate(site.siteId, {
+      onSuccess: (res) => toast.success(res.data.message),
+      onError: () => toast.error('Failed to update site status'),
+    });
   };
+
+  const liveCount = sites.filter((s) => s.status === 'active').length;
+
+  // Search, filter and sort all run client-side. /api/sites already returns the
+  // whole list in one call, so round-tripping for these would be slower than
+  // filtering an array we are holding anyway.
+  const visible = sites
+    .filter((s) =>
+      filter === 'All' ? true : filter === 'Live' ? s.status === 'active' : s.status !== 'active',
+    )
+    .filter((s) => {
+      const q = query.trim().toLowerCase();
+      if (!q) return true;
+      return (
+        s.name.toLowerCase().includes(q) ||
+        (s.slug || '').toLowerCase().includes(q) ||
+        (s.customDomain || '').toLowerCase().includes(q)
+      );
+    })
+    .sort((a, b) => {
+      if (sort === 'visits') return (b.visits || 0) - (a.visits || 0);
+      if (sort === 'name') return a.name.localeCompare(b.name);
+      return (
+        new Date(b.updated_at || b.created_at).getTime() -
+        new Date(a.updated_at || a.created_at).getTime()
+      );
+    });
+
+  const FILTERS: Array<'All' | 'Live' | 'Paused'> = ['All', 'Live', 'Paused'];
 
   return (
-    <div className="min-h-screen bg-white pt-24 pb-16 px-6">
-      <div className="max-w-[1300px] mx-auto">
-        <div className="flex items-center justify-between mb-10">
+    <div className="min-h-screen bg-white px-6 pb-20 pt-24 sm:px-10">
+      <div className="mx-auto max-w-[1300px]">
+        <div className="mb-7 flex flex-wrap items-end justify-between gap-6">
           <div>
-            <h1 className="font-bebas text-5xl text-slate-900">Your Sites</h1>
-            <p className="text-slate-500 text-sm mt-1">
-              Hey {user?.name} — {sites.length} site{sites.length !== 1 ? 's' : ''} deployed
+            <h1 className="font-bebas text-[52px] leading-none tracking-[0.01em] text-slate-900">
+              Your Sites
+            </h1>
+            <p className="mt-2 text-[13.5px] text-slate-500">
+              Hey {user?.name}
+              {!loading && sites.length > 0 && (
+                <>
+                  {' '}— {sites.length} site{sites.length === 1 ? '' : 's'} deployed · {liveCount} live
+                </>
+              )}
             </p>
           </div>
           {!loading && sites.length > 0 && (
             <button
               onClick={() => setNewSiteOpen(true)}
-              className="flex items-center gap-2 bg-primary text-white font-semibold px-5 py-3 rounded-xl hover:bg-primary-dark transition-colors shrink-0"
+              className="flex shrink-0 items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-dark"
             >
               <Plus size={16} /> New Site
             </button>
           )}
         </div>
 
+        {/* Toolbar — only worth showing once there is something to sift through. */}
+        {!loading && sites.length > 0 && (
+          <div className="mb-7 flex flex-wrap items-center gap-3 border-b border-slate-200 pb-5">
+            <div className="relative flex-[0_1_320px]">
+              <Search
+                size={14}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search sites or domains"
+                className="w-full rounded-[10px] border border-slate-200 bg-slate-50 py-[9px] pl-8 pr-3 text-[13px] text-slate-900 outline-none transition-colors focus:border-primary focus:bg-white"
+              />
+            </div>
+
+            <div className="flex gap-0.5 rounded-[10px] bg-slate-100 p-[3px]">
+              {FILTERS.map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  className={`rounded-lg border-0 px-[13px] py-1.5 text-[12.5px] transition-colors ${
+                    filter === f
+                      ? 'bg-white font-semibold text-slate-900 shadow-sm'
+                      : 'bg-transparent font-medium text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex-1" />
+
+            <label className="flex items-center gap-2">
+              <span className="sr-only">Sort sites by</span>
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value as 'deployed' | 'visits' | 'name')}
+                className="cursor-pointer rounded-[10px] border border-slate-200 bg-white px-3 py-[9px] text-[13px] font-medium text-slate-600 outline-none transition-colors hover:border-slate-300 focus:border-primary"
+              >
+                <option value="deployed">Last deployed</option>
+                <option value="visits">Most visits</option>
+                <option value="name">Name (A–Z)</option>
+              </select>
+            </label>
+          </div>
+        )}
+
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-56 bg-slate-100 rounded-2xl animate-pulse" />
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="h-[300px] animate-pulse rounded-[14px] border border-slate-200 bg-slate-50"
+              />
             ))}
           </div>
         ) : sites.length === 0 ? (
@@ -171,20 +273,33 @@ export default function Dashboard() {
               Create Your First Site
             </button>
           </motion.div>
+        ) : visible.length === 0 ? (
+          <div className="rounded-2xl border border-slate-200 px-6 py-16 text-center">
+            <p className="text-sm text-slate-500">
+              No sites match {query.trim() ? `“${query.trim()}”` : `the ${filter} filter`}.
+            </p>
+            <button
+              onClick={() => {
+                setQuery('');
+                setFilter('All');
+              }}
+              className="mt-3 text-sm font-medium text-primary hover:text-primary-dark"
+            >
+              Clear filters
+            </button>
+          </div>
         ) : (
-          <AnimatePresence>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {sites.map((site) => (
-                <SiteCard
-                  key={site.siteId}
-                  site={site}
-                  onDelete={handleDelete}
-                  onToggle={handleToggle}
-                  onRename={handleRename}
-                />
-              ))}
-            </div>
-          </AnimatePresence>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {visible.map((site) => (
+              <SiteGridCard
+                key={site.siteId}
+                site={site}
+                onToggle={handleToggle}
+                onRename={handleRename}
+                onDelete={handleDelete}
+              />
+            ))}
+          </div>
         )}
       </div>
 

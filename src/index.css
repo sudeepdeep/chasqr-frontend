@@ -152,3 +152,28 @@
     animation: none !important;
   }
 }
+
+/* ─── LandingPro handoff ────────────────────────────────────────────────────
+   The design hand-off ships global CSS that assumes its page IS the whole app.
+   Applying it as-is would repaint the dashboard, admin panel and every other
+   screen, so only the genuinely page-agnostic parts are global here; the rest
+   is scoped. <main> in LandingPro already sets its own font, colour and
+   background, which is what makes that safe to drop.
+──────────────────────────────────────────────────────────────────────────── */
+html { scroll-behavior: smooth; }
+
+/* Anchor jumps from the chapter rail must clear the fixed 64px navbar. */
+.landing-pro [id] { scroll-margin-top: 64px; }
+
+.landing-pro a { color: #2563EB; text-decoration: none; }
+.landing-pro a:hover { color: #1D4ED8; }
+.landing-pro :focus-visible {
+  outline: 2px solid #2563EB;
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+.landing-pro ::selection { background: #38BDF8; color: #0A0F1C; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}

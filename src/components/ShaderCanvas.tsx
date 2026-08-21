@@ -31,9 +31,18 @@ const hexToRgb = (hex: string): [number, number, number] => {
  */
 export default function ShaderCanvas({
   preset = "aurora",
+  colors,
+  bg,
+  speed = 1.2,
   className = "",
 }: {
   preset?: string;
+  /** Overrides the preset — four hex colours, blended darkest-last. */
+  colors?: string[];
+  /** Overrides the preset background hex. */
+  bg?: string;
+  /** Lower is calmer. Thumbnails run slow so a grid of them isn't busy. */
+  speed?: number;
   className?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -84,10 +93,11 @@ export default function ShaderCanvas({
     };
 
     const conf = PRESETS[preset] ?? PRESETS.aurora;
+    const palette = colors && colors.length >= 4 ? colors : conf.colors;
     // Hoisted out of the frame loop — re-parsing hex 60 times a second is pure
     // waste, and the palette never changes while mounted.
-    const flat = new Float32Array(conf.colors.flatMap(hexToRgb));
-    const bg = hexToRgb(conf.bg);
+    const flat = new Float32Array(palette.slice(0, 4).flatMap(hexToRgb));
+    const bgRgb = hexToRgb(bg || conf.bg);
 
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio, 2);
@@ -108,10 +118,10 @@ export default function ShaderCanvas({
     const draw = (t: number) => {
       resize();
       gl.uniform2f(locs.res, canvas.width, canvas.height);
-      gl.uniform1f(locs.time, t * 0.001 * 1.2);
+      gl.uniform1f(locs.time, t * 0.001 * speed);
       gl.uniform1f(locs.grain, 0.25);
       gl.uniform3fv(locs.colors, flat);
-      gl.uniform3f(locs.bg, bg[0], bg[1], bg[2]);
+      gl.uniform3f(locs.bg, bgRgb[0], bgRgb[1], bgRgb[2]);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     };
 
@@ -133,7 +143,11 @@ export default function ShaderCanvas({
       // preview would eventually stop new banners from rendering at all.
       gl.getExtension("WEBGL_lose_context")?.loseContext();
     };
-  }, [preset]);
+    // `colors` is keyed by value, not identity. A caller passing an inline
+    // array literal would otherwise hand us a new reference every render and
+    // rebuild the entire WebGL context each time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preset, colors?.join(","), bg, speed]);
 
   return <canvas ref={canvasRef} className={className} aria-hidden="true" />;
 }

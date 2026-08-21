@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useQueries } from "@tanstack/react-query";
 import {
   ArrowRight,
   BarChart3,
@@ -9,7 +9,8 @@ import {
   Layers,
   TrendingUp,
 } from "lucide-react";
-import { getMySitesAPI, getAnalyticsAPI } from "../api/site.api";
+import { getAnalyticsAPI } from "../api/site.api";
+import { siteKeys, useSites, SiteAnalytics, SiteSummary } from "../queries/sites";
 
 interface Site {
   siteId: string;
@@ -77,78 +78,57 @@ function Stat({
  * dozens of sites this wants a single summary endpoint instead.
  */
 export default function Analytics() {
-  const [sites, setSites] = useState<Site[] | null>(null);
-  const [trend, setTrend] = useState<DayPoint[]>([]);
-  const [countries, setCountries] = useState<CountryPoint[]>([]);
-  const [last30, setLast30] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
+  // Same cache entry the Dashboard fills, so arriving from there costs nothing.
+  const { data: siteData, isPending: sitesPending, isError: failed } = useSites();
+  const sites = (siteData ?? null) as Site[] | null;
 
-  useEffect(() => {
-    let cancelled = false;
+  // One query per site instead of a hand-rolled Promise.allSettled. Each result
+  // is cached under its own key, so a site's chart survives leaving this page —
+  // and re-entering re-runs nothing while the data is still fresh.
+  const analyticsQueries = useQueries({
+    queries: (siteData ?? []).map((s: SiteSummary) => ({
+      queryKey: siteKeys.analytics(s.siteId),
+      queryFn: async (): Promise<SiteAnalytics> => {
+        const res = await getAnalyticsAPI(s.siteId);
+        return res.data.data;
+      },
+    })),
+  });
 
-    getMySitesAPI()
-      .then(async (res) => {
-        const list: Site[] = res.data.data.sites ?? [];
-        if (cancelled) return;
-        setSites(list);
-        if (list.length === 0) return;
+  // A site whose analytics call failed simply contributes nothing, exactly as
+  // allSettled did — one bad site must not blank the whole report.
+  const ok = analyticsQueries
+    .map((q) => q.data)
+    .filter((d): d is SiteAnalytics => !!d);
 
-        const results = await Promise.allSettled(
-          list.map((s) => getAnalyticsAPI(s.siteId)),
-        );
-        if (cancelled) return;
+  const loading = sitesPending;
+  const last30 = ok.reduce((n, a) => n + (a.last30Days || 0), 0);
 
-        const ok = results
-          .filter(
-            (r): r is PromiseFulfilledResult<any> => r.status === "fulfilled",
-          )
-          .map((r) => r.value.data.data)
-          .filter(Boolean);
+  // Date axis comes from the first series rather than a sort: these are display
+  // strings, and sorting them as text would scramble the order.
+  const trend: DayPoint[] =
+    ok.length > 0 && ok[0].chartData?.length
+      ? ok[0].chartData.map((point) => ({
+          date: point.date,
+          visits: ok.reduce(
+            (sum, a) =>
+              sum + (a.chartData?.find((d) => d.date === point.date)?.visits ?? 0),
+            0,
+          ),
+        }))
+      : [];
 
-        // Date axis comes from the first series rather than a sort: these are
-        // display strings, and sorting them as text would scramble the order.
-        if (ok.length > 0 && ok[0].chartData?.length) {
-          setTrend(
-            ok[0].chartData.map((point: DayPoint) => ({
-              date: point.date,
-              visits: ok.reduce(
-                (sum, a) =>
-                  sum +
-                  ((a.chartData as DayPoint[])?.find(
-                    (d) => d.date === point.date,
-                  )?.visits ?? 0),
-                0,
-              ),
-            })),
-          );
-        }
-
-        setLast30(ok.reduce((n, a) => n + (a.last30Days || 0), 0));
-
-        const tally = new Map<string, CountryPoint>();
-        ok.forEach((a) =>
-          ((a.countries as CountryPoint[]) ?? []).forEach((c) => {
-            const seen = tally.get(c.code);
-            if (seen) seen.visits += c.visits;
-            else tally.set(c.code, { ...c });
-          }),
-        );
-        setCountries(
-          Array.from(tally.values()).sort((a, b) => b.visits - a.visits),
-        );
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const countries: CountryPoint[] = (() => {
+    const tally = new Map<string, CountryPoint>();
+    ok.forEach((a) =>
+      (a.countries ?? []).forEach((c) => {
+        const seen = tally.get(c.code);
+        if (seen) seen.visits += c.visits;
+        else tally.set(c.code, { ...c });
+      }),
+    );
+    return Array.from(tally.values()).sort((a, b) => b.visits - a.visits);
+  })();
 
   const totalVisits = sites?.reduce((n, s) => n + (s.visits || 0), 0) ?? 0;
   const live = sites?.filter((s) => s.status === "active").length ?? 0;

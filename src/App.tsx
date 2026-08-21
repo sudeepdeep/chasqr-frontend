@@ -4,6 +4,7 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 import ProtectedRoute from './components/ProtectedRoute';
+import PublicOnlyRoute from './components/PublicOnlyRoute';
 import AppLayout from './layout/AppLayout';
 import AdminPanel from './pages/AdminPanel';
 import Analytics from './pages/Analytics';
@@ -15,6 +16,7 @@ import ExpertPanel from './pages/ExpertPanel';
 import ForgotPassword from './pages/ForgotPassword';
 import GithubCallback from './pages/GithubCallback';
 import ImportGithub from './pages/ImportGithub';
+import Landing3D from './pages/Landing3D';
 import LandingV2 from './pages/LandingV2';
 import Login from './pages/Login';
 import Privacy from './pages/Privacy';
@@ -41,7 +43,10 @@ const router = createBrowserRouter([
     path: '/',
     element: <AppLayout />,
     children: [
-      { path: '/', element: <LandingV2 /> },
+      // Signed-in users never see the marketing page — they land on the dashboard.
+      { path: '/', element: <PublicOnlyRoute><Landing3D /></PublicOnlyRoute> },
+      // Previous landing, kept reachable while the 3D page beds in.
+      { path: '/v2', element: <LandingV2 /> },
       // Alternate landing page, live alongside the current one while we pick.
       // { path: '/v2', element: <LandingV2 /> },
       // { path: '/v3', element: <LandingV3 /> },
