@@ -14,17 +14,10 @@ import LandingPro from "./LandingPro";
  * that reports success while dropping the message on the floor is worse than
  * one that visibly fails.
  */
-const CONTACT_SITE_ID = process.env.REACT_APP_CONTACT_SITE_ID;
 
 async function submitContact(form: Record<string, string>): Promise<void> {
-  if (!CONTACT_SITE_ID) {
-    toast.error("Contact form isn't connected yet — please email us directly.");
-    throw new Error(
-      "REACT_APP_CONTACT_SITE_ID is not set; landing contact form has nowhere to post",
-    );
-  }
   try {
-    await api.post(`/api/forms/${CONTACT_SITE_ID}/submit`, form);
+    await api.post(`/api/forms/landing/submit`, form);
   } catch (err) {
     toast.error("Couldn't send that — please try again.");
     throw err;
