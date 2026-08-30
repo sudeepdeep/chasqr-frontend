@@ -2,7 +2,12 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Mail, Trash2, Inbox, Copy, FileSearch, Zap, BookOpen } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getSubmissionsAPI, deleteSubmissionAPI, connectFormAPI } from "../api/site.api";
+
+const submissionKeys = {
+  list: (siteId: string) => ["submissions", siteId] as const,
+};
 
 interface DetectedForm {
   key: string;
@@ -48,18 +53,29 @@ interface Props {
 }
 
 export default function Submissions({ siteId, page, forms, isPro, onFormsChange }: Props) {
-  const [items, setItems] = useState<Submission[]>([]);
-  const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [togglingKey, setTogglingKey] = useState<string | null>(null);
+  // On by default: a form in a shared header or footer exists on every page,
+  // and connecting only the page you happen to be looking at leaves the rest
+  // submitting nowhere.
+  const [allPages, setAllPages] = useState(true);
 
   const toggleForm = async (formKey: string, connect: boolean) => {
     if (!page) return;
     setTogglingKey(formKey);
     try {
-      const res = await connectFormAPI(siteId, page, formKey, connect);
+      const res = await connectFormAPI(siteId, page, formKey, connect, allPages);
       onFormsChange?.(res.data.data.site);
-      toast.success(connect ? "Form connected — submissions will show up here" : "Form disconnected");
+      const count = res.data.data.pages ?? 1;
+      toast.success(
+        connect
+          ? count > 1
+            ? `Form connected on ${count} pages — submissions will show up here`
+            : "Form connected — submissions will show up here"
+          : count > 1
+            ? `Form disconnected on ${count} pages`
+            : "Form disconnected",
+      );
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to update form");
     } finally {
@@ -67,21 +83,32 @@ export default function Submissions({ siteId, page, forms, isPro, onFormsChange 
     }
   };
 
+  // Cached per site, so switching away to Colors or SEO and back no longer
+  // refetches the whole submission list each time.
+  const qc = useQueryClient();
+  const { data, isPending: loading, isError } = useQuery({
+    queryKey: submissionKeys.list(siteId),
+    queryFn: async (): Promise<Submission[]> => {
+      const res = await getSubmissionsAPI(siteId);
+      return res.data.data.submissions ?? [];
+    },
+  });
+  const items: Submission[] = data ?? [];
+
   useEffect(() => {
-    let cancelled = false;
-    getSubmissionsAPI(siteId)
-      .then((res) => { if (!cancelled) setItems(res.data.data.submissions); })
-      .catch(() => { if (!cancelled) toast.error("Failed to load submissions"); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [siteId]);
+    if (isError) toast.error("Failed to load submissions");
+  }, [isError]);
 
   const remove = async (id: string) => {
     if (!window.confirm("Delete this submission permanently?")) return;
     setDeleting(id);
     try {
       await deleteSubmissionAPI(siteId, id);
-      setItems((prev) => prev.filter((s) => s._id !== id));
+      qc.setQueryData<Submission[]>(
+        submissionKeys.list(siteId),
+        (prev: Submission[] | undefined) =>
+          prev ? prev.filter((s: Submission) => s._id !== id) : prev,
+      );
     } catch {
       toast.error("Failed to delete");
     } finally {
@@ -112,6 +139,19 @@ export default function Submissions({ siteId, page, forms, isPro, onFormsChange 
           <p className="text-xs text-slate-500 mb-3">
             We detected {forms.length} form{forms.length === 1 ? "" : "s"} in your uploaded HTML. Connect the ones that are actual contact forms — leave search bars, logins, or newsletter widgets off.
           </p>
+          {/* Matching is by field list, since a form's key is assigned per file
+              and the same footer form is numbered differently on each page. */}
+          <label className="mb-3 flex items-center gap-2 text-xs text-slate-600">
+            <input
+              type="checkbox"
+              checked={allPages}
+              onChange={(e) => setAllPages(e.target.checked)}
+              className="h-3.5 w-3.5 accent-[color:var(--primary)]"
+            />
+            Apply to every page that has this form
+            <span className="text-slate-400">— for shared headers and footers</span>
+          </label>
+
           <div className="space-y-2">
             {forms.map((f) => (
               <div key={f.key} className={`flex items-center justify-between gap-3 border rounded-lg p-3 ${f.connected ? "border-primary/30 bg-primary-light/40" : "border-slate-200"}`}>

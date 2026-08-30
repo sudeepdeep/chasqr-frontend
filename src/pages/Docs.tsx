@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { useInShell } from "../layout/shellContext";
 import ImageLightbox from "../components/ImageLightbox";
 
 const API_URL = process.env.REACT_APP_API_URL || "https://api.chasqr.com";
@@ -487,6 +488,9 @@ function Card({
 /* ── Page ─────────────────────────────────────────────────────────────────── */
 
 export default function Docs() {
+  // Signed in this page sits in the app shell, whose header takes up its
+  // own space; the public navbar is fixed and has to be cleared.
+  const inShell = useInShell();
   const [activeId, setActiveId] = useState(ALL_SECTIONS[0].id);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
@@ -560,7 +564,7 @@ export default function Docs() {
   const refs = sectionRefs;
 
   return (
-    <div className="min-h-screen bg-white pt-28 pb-20 px-6">
+    <div className={`min-h-screen bg-white pb-20 px-6 ${inShell ? "pt-10" : "pt-28"}`}>
       <div className="max-w-[1200px] mx-auto">
         <h1 className="font-bebas text-5xl text-slate-900 mb-3">
           Documentation

@@ -63,7 +63,6 @@ export default function SiteSeoChecker({ siteId, pages, onSiteUpdated }: Props) 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="font-bebas text-2xl text-slate-900 mb-1">SEO Checker</h2>
         <p className="text-xs text-slate-500">
           Run a full SEO audit on this site — then fix the common issues in one click.
         </p>

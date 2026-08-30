@@ -172,7 +172,7 @@ export default function Dashboard() {
   const FILTERS: Array<'All' | 'Live' | 'Paused'> = ['All', 'Live', 'Paused'];
 
   return (
-    <div className="min-h-screen bg-white px-6 pb-20 pt-24 sm:px-10">
+    <div className="min-h-screen bg-white px-6 pb-20 pt-8 sm:px-10">
       <div className="mx-auto max-w-[1300px]">
         <div className="mb-7 flex flex-wrap items-end justify-between gap-6">
           <div>

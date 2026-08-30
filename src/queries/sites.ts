@@ -3,6 +3,7 @@ import {
   deleteSiteAPI,
   getAnalyticsAPI,
   getMySitesAPI,
+  getSiteAPI,
   renameSiteAPI,
   toggleStatusAPI,
 } from "../api/site.api";
@@ -48,6 +49,7 @@ export interface SiteAnalytics {
 export const siteKeys = {
   all: ["sites"] as const,
   list: () => [...siteKeys.all, "list"] as const,
+  detail: (siteId: string) => [...siteKeys.all, "detail", siteId] as const,
   analytics: (siteId: string) => [...siteKeys.all, "analytics", siteId] as const,
 };
 
@@ -63,6 +65,23 @@ export function useSites() {
     queryFn: async (): Promise<SiteSummary[]> => {
       const res = await getMySitesAPI();
       return res.data.data.sites ?? [];
+    },
+  });
+}
+
+/**
+ * A single site, with everything Site Admin needs.
+ *
+ * Cached per id, so bouncing between the dashboard and a site — the most
+ * common loop in the app — stops refetching the same document every time.
+ */
+export function useSiteDetail(siteId?: string) {
+  return useQuery({
+    queryKey: siteKeys.detail(siteId ?? ""),
+    enabled: !!siteId,
+    queryFn: async () => {
+      const res = await getSiteAPI(siteId as string);
+      return res.data.data.site;
     },
   });
 }

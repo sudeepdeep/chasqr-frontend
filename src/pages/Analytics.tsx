@@ -141,7 +141,7 @@ export default function Analytics() {
   const countryTotal = countries.reduce((n, c) => n + c.visits, 0);
 
   return (
-    <div className="min-h-screen bg-white pt-24 pb-20 px-6">
+    <div className="min-h-screen bg-white pt-8 pb-20 px-6">
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-wrap items-end justify-between gap-4 mb-10">
           <div>

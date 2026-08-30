@@ -64,11 +64,21 @@ export const updateLayoutAPI = (
   footer?: any,
 ) => api.put(`/api/sites/${siteId}/layout`, { page, layout, layoutStyle, nav, footer });
 
+/** Saves a free-positioning Studio page. Separate endpoint, separate shape. */
+export const updateCanvasAPI = (siteId: string, page: string, canvas: any) =>
+  api.put(`/api/sites/${siteId}/canvas`, { page, canvas });
+
 export const getSubmissionsAPI = (siteId: string) =>
   api.get(`/api/sites/${siteId}/submissions`);
 
-export const connectFormAPI = (siteId: string, page: string, formKey: string, connect: boolean) =>
-  api.put(`/api/sites/${siteId}/forms/connect`, { page, formKey, connect });
+export const connectFormAPI = (
+  siteId: string,
+  page: string,
+  formKey: string,
+  connect: boolean,
+  allPages = false,
+) =>
+  api.put(`/api/sites/${siteId}/forms/connect`, { page, formKey, connect, allPages });
 
 export const deleteSubmissionAPI = (siteId: string, id: string) =>
   api.delete(`/api/sites/${siteId}/submissions/${id}`);

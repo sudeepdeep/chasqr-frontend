@@ -73,7 +73,6 @@ export default function GitSettings({ siteId, site, onChange }: Props) {
   if (!git) {
     return (
       <div className="p-5 bg-slate-50 rounded-xl border border-slate-200">
-        <h2 className="font-bebas text-2xl text-slate-900 mb-1">GitHub</h2>
         <p className="text-xs text-slate-500 mb-4">
           This site isn't connected to a repository.
         </p>
@@ -96,7 +95,6 @@ export default function GitSettings({ siteId, site, onChange }: Props) {
   return (
     <div className="space-y-5">
       <div className="p-5 bg-slate-50 rounded-xl border border-slate-200">
-        <h2 className="font-bebas text-2xl text-slate-900 mb-1">GitHub</h2>
         <p className="text-xs text-slate-500 mb-4">
           Where this site's files come from.
         </p>

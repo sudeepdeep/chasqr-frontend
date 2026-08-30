@@ -61,6 +61,7 @@ import {
   FastForward,
   ChevronUp,
   ChevronDown,
+  ChevronRight,
   Check,
   X,
   Search,
@@ -71,6 +72,15 @@ import {
 } from "lucide-react";
 import ShaderCanvas from "./ShaderCanvas";
 import StyleToolbar from "./StyleToolbar";
+import BlockPreview from "./BlockPreview";
+import LivePreview from "./LivePreview";
+import SplitPane from "./SplitPane";
+import BuilderPaletteBody, {
+  LayerNode,
+  PaletteCategory,
+  PaletteEntry,
+  PaletteGroup,
+} from "./BuilderPaletteBody";
 import { updateLayoutAPI, uploadAssetAPI } from "../api/site.api";
 
 type BlockType =
@@ -1795,7 +1805,7 @@ export default function LayoutBuilder({
               </div>
             </div>
 
-            {settingsFor === section.id && (
+            {settingsFor === section.id && !fullscreen && (
               <SectionSettings
                 section={section}
                 onPatch={(patch) => patchSection(section.id, patch)}
@@ -1880,26 +1890,113 @@ export default function LayoutBuilder({
     </DndContext>
   );
 
+  /**
+   * Flattened section → column → block tree for the Layers panel.
+   *
+   * Built here rather than in the panel because this is where the sections and
+   * the selection live. Columns are the only selectable rows: they are what the
+   * palette actually inserts into, so clicking one both highlights it on the
+   * canvas and retargets the next insert.
+   */
+  const layers: LayerNode[] = sections.flatMap((sec, si) => {
+    const rows: LayerNode[] = [
+      {
+        id: sec.id,
+        label: `Section ${si + 1}${sec.full ? " — full width" : ""}`,
+        tag: "section",
+        depth: 0,
+      },
+    ];
+    (sec.columns || []).forEach((col, ci) => {
+      rows.push({
+        id: col.id,
+        label: `Column ${ci + 1} · ${col.span}/12`,
+        tag: "col",
+        depth: 1,
+        selectable: true,
+        active: activeColumnId === col.id,
+        onSelect: () => setActiveColumnId(col.id),
+      });
+      (col.blocks || []).forEach((b) =>
+        rows.push({
+          id: b.id,
+          label: b.text?.trim() ? b.text.trim().slice(0, 28) : b.type,
+          tag: b.type,
+          depth: 2,
+        }),
+      );
+    });
+    return rows;
+  });
+
+  // Where the next inserted element lands, in the same words the canvas uses.
+  const insertingInto = (() => {
+    if (!sections.length) return "a new section";
+    let target: string | null = null;
+    sections.forEach((sec, si) =>
+      (sec.columns || []).forEach((col, ci) => {
+        if (col.id === activeColumnId) target = `Section ${si + 1} › Column ${ci + 1}`;
+      }),
+    );
+    return target
+      ? `${target} · at the end`
+      : `Section ${sections.length} · last column`;
+  })();
+
+  // The rail follows the Style button, falling back to whichever section owns
+  // the selected column so it is rarely empty while you are working.
+  const inspectorIndex = (() => {
+    const byStyle = sections.findIndex((sec) => sec.id === settingsFor);
+    if (byStyle >= 0) return byStyle;
+    return sections.findIndex((sec) =>
+      (sec.columns || []).some((c) => c.id === activeColumnId),
+    );
+  })();
+  const inspectorSection = inspectorIndex >= 0 ? sections[inspectorIndex] : null;
+
   if (fullscreen) {
     return (
       <div className="fixed inset-0 z-40 bg-slate-100 flex flex-col">
-        <div className="h-14 shrink-0 bg-white border-b border-slate-200 flex items-center justify-between px-4 gap-3">
-          <div className="flex items-center gap-2">
+        <div className="h-14 shrink-0 bg-white border-b border-slate-200 flex items-center px-4 gap-3">
+          <div className="flex items-center gap-2 min-w-0">
             {onExit && (
               <button
                 onClick={onExit}
-                className="flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-primary px-2 py-2 rounded-lg hover:bg-slate-50"
+                className="flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-primary px-2 py-2 rounded-lg hover:bg-slate-50"
               >
-                <ArrowLeft size={16} /> Back
+                <ArrowLeft size={16} /> Editor
               </button>
             )}
             <span className="w-px h-6 bg-slate-200 mx-1" />
-            {deviceToggle}
+            {/* Says what you are editing. Without it the builder is a bare
+                canvas with no indication of which page it belongs to. */}
+            <div className="min-w-0 leading-tight">
+              <p className="text-[15px] font-semibold text-slate-900">Layout</p>
+              <p className="truncate text-[11.5px] text-slate-400">
+                {page} · {sections.length} section{sections.length === 1 ? "" : "s"}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex-1" />
+          {deviceToggle}
+          <div className="flex items-center gap-2">
             {bgBtn}
             {navBtn}
             {footerBtn}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex-1" />
+
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Unsaved work is the one thing worth interrupting for, so it sits
+                next to the button that resolves it. */}
+            <span
+              className={`hidden rounded-lg px-2.5 py-1.5 text-[12px] font-semibold sm:block ${
+                dirty ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700"
+              }`}
+            >
+              {dirty ? "Unsaved" : "Saved"}
+            </span>
             {previewUrl && (
               <a
                 href={previewUrl}
@@ -1907,7 +2004,7 @@ export default function LayoutBuilder({
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 border border-slate-200 text-slate-600 text-sm font-medium px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors"
               >
-                <ExternalLink size={15} /> Preview site
+                <ExternalLink size={15} /> Preview
               </a>
             )}
             {saveBtn}
@@ -1923,14 +2020,81 @@ export default function LayoutBuilder({
               patchNav({ enabled: true, glass: true });
               setNavOpen(true);
             }}
+            layers={layers}
+            insertingInto={insertingInto}
           />
-          <div className="flex-1 overflow-auto p-6">
-            <div className="max-w-[1040px] mx-auto">
-              {panels}
-              {emptyState}
-              {canvas}
-            </div>
+          {/* Editor on top, live result underneath, divider draggable between
+              them. Both are needed at once — one to change things, one to see
+              what changed — and how much of each depends on the task. */}
+          <div className="flex min-w-0 flex-1 flex-col">
+            <SplitPane
+              bottomLabel={
+                <>
+                  Live preview
+                  <span className="ml-1.5 font-normal normal-case text-slate-400">
+                    · {device === "mobile" ? "mobile 390px" : "desktop"}
+                  </span>
+                </>
+              }
+              top={
+                <div className="p-6">
+                  <div className="mx-auto max-w-[1040px]">
+                    {panels}
+                    {emptyState}
+                    {canvas}
+                  </div>
+                </div>
+              }
+              bottom={
+                <LivePreview
+                  sections={sections}
+                  layoutStyle={layoutStyle}
+                  nav={nav}
+                  footer={footer}
+                  device={device}
+                />
+              }
+            />
           </div>
+
+          {/* Inspector. The same SectionSettings that used to open inline under
+              a section — moving it here is the point: inline, it shoved the
+              canvas down every time you opened it, so you lost sight of the
+              thing you were styling. */}
+          <aside className="hidden w-[300px] shrink-0 flex-col border-l border-slate-200 bg-white xl:flex">
+            {inspectorSection ? (
+              <>
+                <div className="shrink-0 border-b border-slate-200 px-4 py-3">
+                  <div className="flex items-center gap-1 text-[11.5px] text-slate-400">
+                    <span>Page</span>
+                    <ChevronRight size={11} />
+                    <span className="font-medium text-slate-700">
+                      Section {inspectorIndex + 1}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[13px] font-semibold text-slate-900">
+                    {inspectorSection.full ? "Full width" : "Contained"} ·{" "}
+                    {inspectorSection.columns.length} column
+                    {inspectorSection.columns.length === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                  <SectionSettings
+                    section={inspectorSection}
+                    onPatch={(patch) => patchSection(inspectorSection.id, patch)}
+                    siteId={siteId}
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-1 items-center justify-center px-6 text-center">
+                <p className="text-[12.5px] leading-relaxed text-slate-400">
+                  Select a section on the canvas — or press its Style button — to
+                  edit size, background and spacing here.
+                </p>
+              </div>
+            )}
+          </aside>
         </div>
       </div>
     );
@@ -3034,6 +3198,10 @@ function SortableBlock({
     opacity: isDragging ? 0.4 : 1,
   };
   const [uploading, setUploading] = useState(false);
+  // Controls stay mounted but hidden rather than unmounted: several of them
+  // hold their own local state (upload progress, carousel drafts), and tearing
+  // that down every time you clicked away would lose work in progress.
+  const [editing, setEditing] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const uploadImg = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -3058,7 +3226,9 @@ function SortableBlock({
       ref={setNodeRef}
       style={style}
       data-cq-id={block.id}
-      className="bg-white border border-slate-200 rounded-lg p-2"
+      className={`rounded-lg border p-2 transition-colors ${
+        editing ? "border-primary bg-primary-light/20" : "border-transparent bg-white hover:border-slate-200"
+      }`}
     >
       <div className="flex items-start gap-1.5">
         <button
@@ -3070,6 +3240,20 @@ function SortableBlock({
           <GripVertical size={14} />
         </button>
         <div className="flex-1 min-w-0">
+          {/* Preview first. The controls below open only for the block being
+              edited, so the canvas reads as a page instead of a stack of
+              forms — the whole point of the redesign. */}
+          {!editing && (
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              title="Click to edit this block"
+              className="block w-full cursor-text rounded-md p-1 text-left transition-colors hover:bg-primary-light/40"
+            >
+              <BlockPreview block={block} />
+            </button>
+          )}
+          <div className={editing ? "" : "hidden"}>
           {block.type === "heading" && (
             <>
               <input
@@ -3645,14 +3829,26 @@ function SortableBlock({
             </div>
           )}
           <BoxToolbar block={block} onPatch={onPatch} />
+          </div>
         </div>
-        <button
-          onClick={() => onRemove(block.id)}
-          title="Delete block"
-          className="text-slate-300 hover:text-red-500 mt-1"
-        >
-          <Trash2 size={13} />
-        </button>
+        <div className="mt-1 flex flex-col items-center gap-1">
+          {editing && (
+            <button
+              onClick={() => setEditing(false)}
+              title="Done editing this block"
+              className="text-primary hover:text-primary-dark"
+            >
+              <Check size={13} />
+            </button>
+          )}
+          <button
+            onClick={() => onRemove(block.id)}
+            title="Delete block"
+            className="text-slate-300 hover:text-red-500"
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -5010,12 +5206,16 @@ function BuilderPalette({
   onAddPreset,
   onEffect,
   onGlassNav,
+  layers,
+  insertingInto,
 }: {
   onAddSection: () => void;
   onAddElement: (t: BlockType, patch?: Partial<Block>) => void;
   onAddPreset: (k: PresetKind) => void;
   onEffect: (patch: Partial<Section>) => void;
   onGlassNav: () => void;
+  layers: LayerNode[];
+  insertingInto?: string;
 }) {
   const elements: [BlockType, any, string][] = [
     ["heading", HeadingIcon, "Heading"],
@@ -5087,87 +5287,79 @@ function BuilderPalette({
     },
     { label: "Glass navbar", icon: PanelTop, nav: true },
   ];
-  const heading = (t: string) => (
-    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide px-1 mt-4 mb-1.5">
-      {t}
-    </p>
-  );
-  const item = (Icon: any, label: string, onClick: () => void, key: string) => (
-    <button
-      key={key}
-      onClick={onClick}
-      className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-slate-600 hover:bg-primary-light hover:text-primary transition-colors text-left"
-    >
-      <Icon size={15} className="shrink-0 text-slate-400" /> {label}
-    </button>
-  );
-  return (
-    <div className="w-60 shrink-0 border-r border-slate-200 bg-white overflow-y-auto p-3">
-      <button
-        onClick={onAddSection}
-        className="w-full flex items-center justify-center gap-1.5 bg-primary text-white text-sm font-semibold px-3 py-2 rounded-lg hover:bg-primary-dark transition-colors mb-2"
-      >
-        <Plus size={15} /> Add Section
-      </button>
-      <p className="text-xs text-slate-400 px-1">
-        Then click an element below to drop it into the selected column
-        (highlighted). Presets add a whole new section.
-      </p>
-      {heading("Elements")}
-      <div className="space-y-0.5">
-        {elements.map(([t, Icon, label]) =>
-          item(Icon, label, () => onAddElement(t), t),
-        )}
-        {item(
-          FastForward,
-          "Marquee",
-          () =>
+  // The lists above are unchanged; this only groups them for the panel. Each
+  // entry keeps the exact handler it had, so inserting behaves identically.
+  const entry = (
+    key: string,
+    label: string,
+    icon: any,
+    run: () => void,
+  ): PaletteEntry => ({ key, label, icon, run });
+
+  const categories: Record<PaletteCategory, PaletteGroup[]> = {
+    Elements: [
+      {
+        title: "Elements",
+        items: [
+          ...elements.map(([t, Icon, label]) =>
+            entry(`el-${t}`, label, Icon, () => onAddElement(t)),
+          ),
+          entry("el-marquee", "Marquee", FastForward, () =>
             onAddElement("tags", {
               marquee: true,
               text: "New\nTrending\nFeatured\nBest seller\nLimited",
             }),
-          "marquee",
-        )}
-      </div>
-      {heading("Utilities (card parts)")}
-      <div className="space-y-0.5">
-        {utilities.map(([t, Icon, label], idx) =>
-          item(Icon, label, () => onAddElement(t), `util-${t}-${idx}`),
-        )}
-      </div>
-      {heading("Form templates")}
-      <div className="space-y-0.5">
-        {formTemplates.map(([k, Icon, label]) =>
-          item(Icon, label, () => onAddPreset(k), k),
-        )}
-      </div>
-      {heading("Banners & sections")}
-      <div className="space-y-0.5">
-        {presets.map(([k, Icon, label]) =>
-          item(Icon, label, () => onAddPreset(k), k),
-        )}
-      </div>
-      {heading("Card templates")}
-      <div className="space-y-0.5">
-        {templates.map(([k, Icon, label]) =>
-          item(Icon, label, () => onAddPreset(k), k),
-        )}
-      </div>
-      {heading("Effects")}
-      <div className="space-y-0.5">
-        {effects.map((e) =>
-          item(
-            e.icon,
-            e.label,
-            () => (e.nav ? onGlassNav() : onEffect(e.patch || {})),
-            e.label,
           ),
-        )}
-      </div>
-      <p className="text-[11px] text-slate-400 px-1 mt-3">
-        Effects apply to the selected / last section.
-      </p>
-    </div>
+        ],
+      },
+      {
+        title: "Utilities (card parts)",
+        items: utilities.map(([t, Icon, label], i) =>
+          entry(`util-${t}-${i}`, label, Icon, () => onAddElement(t)),
+        ),
+      },
+    ],
+    Sections: [
+      {
+        title: "Banners & sections",
+        items: presets.map(([k, Icon, label]) =>
+          entry(`sec-${k}`, label, Icon, () => onAddPreset(k)),
+        ),
+      },
+      {
+        title: "Forms",
+        items: formTemplates.map(([k, Icon, label]) =>
+          entry(`form-${k}`, label, Icon, () => onAddPreset(k)),
+        ),
+      },
+    ],
+    Cards: [
+      {
+        title: "Card templates",
+        items: templates.map(([k, Icon, label]) =>
+          entry(`card-${k}`, label, Icon, () => onAddPreset(k)),
+        ),
+      },
+    ],
+    Effects: [
+      {
+        title: "Applies to the selected section",
+        items: effects.map((e) =>
+          entry(`fx-${e.label}`, e.label, e.icon, () =>
+            e.nav ? onGlassNav() : onEffect(e.patch || {}),
+          ),
+        ),
+      },
+    ],
+  };
+
+  return (
+    <BuilderPaletteBody
+      onAddSection={onAddSection}
+      categories={categories}
+      layers={layers}
+      insertingInto={insertingInto}
+    />
   );
 }
 

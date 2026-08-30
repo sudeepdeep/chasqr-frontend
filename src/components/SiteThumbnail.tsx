@@ -4,9 +4,15 @@ import ShaderCanvas from "./ShaderCanvas";
 /**
  * The card thumbnail, inside its little browser chrome.
  *
- * There is no screenshot pipeline, so rather than leaving a dead grey box each
- * site gets its own animated gradient — the same shader the landing banner
- * runs, in a palette derived from the site.
+ * Each site gets its own animated gradient — the same shader the landing banner
+ * runs, in a palette derived from the site id.
+ *
+ * Two things are deliberate about how it is mounted:
+ *
+ * The palette is *derived*, not random. A card that repainted a different
+ * colour on every visit would read as a glitch; seeded from the id, a site
+ * keeps its colour forever — through renames and custom domains — and the grid
+ * still looks varied.
  *
  * Only cards on screen run a canvas. Browsers cap live WebGL contexts at
  * roughly sixteen, and every context costs a render loop — so a long site list
@@ -15,14 +21,7 @@ import ShaderCanvas from "./ShaderCanvas";
  * matching CSS gradient in its place, which is what paints underneath anyway.
  */
 
-/**
- * Deterministic 0–359 hue.
- *
- * Seeded from the site id, not the name: names are not unique — two sites both
- * called "test" is entirely normal — and identical names would otherwise get
- * identical tiles. The id also never changes, so renaming a site or attaching a
- * custom domain leaves its colour alone.
- */
+/** Deterministic 0–359 hue, seeded from the site id so it never shifts. */
 function hueFor(seed: string): number {
   let h = 0;
   for (let i = 0; i < seed.length; i += 1) h = (h * 31 + seed.charCodeAt(i)) % 360;
@@ -45,15 +44,9 @@ const luma = ([r, g, b]: [number, number, number]) =>
   0.2126 * r + 0.7152 * g + 0.0722 * b;
 
 /**
- * Find the HSL lightness that makes this hue hit a target perceived brightness.
- *
- * HSL lightness is not perceived brightness: at L=58 a yellow measures 0.89
- * luminance against a blue's 0.28, so seeding hues at a fixed lightness makes
- * yellow and green tiles glare while purples and blues stay muted. Solving per
- * hue instead puts every site's tile on the same visual ramp.
- *
- * A short binary search rather than a formula — HSL→luminance has no clean
- * inverse, and twenty iterations once per card is free.
+ * HSL lightness is not perceived brightness — at a fixed L a yellow measures
+ * roughly three times a blue — so solve for the lightness that hits a target
+ * luminance instead. Keeps every site's tile on one visual ramp.
  */
 function lightnessForLuma(h: number, s: number, target: number): number {
   let lo = 0;
@@ -74,28 +67,8 @@ function toHex([r, g, b]: [number, number, number]): string {
   return `#${c(r)}${c(g)}${c(b)}`;
 }
 
-/** A colour at this hue, saturation, and a chosen perceived brightness. */
-function tone(h: number, s: number, targetLuma: number): string {
-  return toHex(hslToRgb(h, s, lightnessForLuma(h, s, targetLuma)));
-}
-
-/**
- * Four analogous tones on a fixed brightness ramp, plus a deep base.
- * Same ramp for every site, so the grid varies in hue but reads as one set.
- */
-const RAMP = [0.5, 0.3, 0.15, 0.06];
-
-function paletteFor(hue: number) {
-  return {
-    colors: [
-      tone((hue + 18) % 360, 80, RAMP[0]),
-      tone(hue, 78, RAMP[1]),
-      tone((hue + 340) % 360, 70, RAMP[2]),
-      tone((hue + 300) % 360, 60, RAMP[3]),
-    ],
-    bg: tone(hue, 50, 0.03),
-  };
-}
+const tone = (h: number, s: number, target: number) =>
+  toHex(hslToRgb(h, s, lightnessForLuma(h, s, target)));
 
 export default function SiteThumbnail({
   seed,
@@ -105,6 +78,7 @@ export default function SiteThumbnail({
   /** Stable unique key for the colour — the site id. */
   seed: string;
   name: string;
+  /** Host shown in the chrome bar. */
   url: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -121,8 +95,17 @@ export default function SiteThumbnail({
   }, []);
 
   const hue = hueFor(seed || name || url);
-  const { colors, bg } = paletteFor(hue);
   const letter = (name || url || "?").trim()[0]?.toUpperCase() || "?";
+
+  // Four analogous tones on a fixed brightness ramp, so every site's tile is
+  // equally bright however its hue landed.
+  const colors = [
+    tone((hue + 18) % 360, 80, 0.5),
+    tone(hue, 78, 0.3),
+    tone((hue + 340) % 360, 70, 0.15),
+    tone((hue + 300) % 360, 60, 0.06),
+  ];
+  const bg = tone(hue, 50, 0.03);
 
   return (
     <div className="p-2 pb-0">

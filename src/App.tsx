@@ -5,7 +5,9 @@ import 'react-toastify/dist/ReactToastify.css';
 
 import ProtectedRoute from './components/ProtectedRoute';
 import PublicOnlyRoute from './components/PublicOnlyRoute';
+import AdaptiveLayout from './layout/AdaptiveLayout';
 import AppLayout from './layout/AppLayout';
+import ShellLayout from './layout/ShellLayout';
 import AdminPanel from './pages/AdminPanel';
 import Analytics from './pages/Analytics';
 import Build from './pages/Build';
@@ -25,6 +27,7 @@ import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
 import SeoChecker from './pages/SeoChecker';
 import SiteAdmin from './pages/SiteAdmin';
+import Studio from './pages/Studio';
 import Terms from './pages/Terms';
 import Transactions from './pages/Transactions';
 import Upload from './pages/Upload';
@@ -35,6 +38,18 @@ const router = createBrowserRouter([
   // Outside ProtectedRoute on purpose — the user isn't signed in yet when
   // GitHub redirects them back here.
   { path: '/auth/github/callback', element: <GithubCallback /> },
+  // Builds its own shell (same header, site-specific sidebar), so it sits
+  // outside both layouts rather than inheriting the wrong navigation.
+  {
+    path: '/sites/:siteId',
+    element: <ProtectedRoute><SiteAdmin /></ProtectedRoute>,
+  },
+  // Free-positioning editor. Alongside the grid builder, not replacing it —
+  // the two use incompatible layout models.
+  {
+    path: '/sites/:siteId/studio',
+    element: <ProtectedRoute><Studio /></ProtectedRoute>,
+  },
   {
     path: '/sites/:siteId/builder',
     element: <ProtectedRoute><Builder /></ProtectedRoute>,
@@ -50,24 +65,10 @@ const router = createBrowserRouter([
       // Alternate landing page, live alongside the current one while we pick.
       // { path: '/v2', element: <LandingV2 /> },
       // { path: '/v3', element: <LandingV3 /> },
-      { path: '/docs', element: <Docs /> },
-      { path: '/seo-checker', element: <SeoChecker /> },
       { path: '/terms', element: <Terms /> },
       { path: '/privacy', element: <Privacy /> },
       { path: '/forgot-password', element: <ForgotPassword /> },
       { path: '/reset-password', element: <ResetPassword /> },
-      {
-        path: '/dashboard',
-        element: <ProtectedRoute><Dashboard /></ProtectedRoute>,
-      },
-      {
-        path: '/analytics',
-        element: <ProtectedRoute><Analytics /></ProtectedRoute>,
-      },
-      {
-        path: '/profile',
-        element: <ProtectedRoute><Profile /></ProtectedRoute>,
-      },
       {
         path: '/upload',
         element: <ProtectedRoute><Upload /></ProtectedRoute>,
@@ -80,9 +81,37 @@ const router = createBrowserRouter([
         path: '/import/github',
         element: <ProtectedRoute><ImportGithub /></ProtectedRoute>,
       },
+    ],
+  },
+  // Signed-in workspace: its own header + sidebar shell, so these screens never
+  // show the marketing navbar. Site Admin is separate — inside a project the
+  // sidebar becomes that site's sections rather than the workspace links.
+
+  // Docs and the SEO Checker belong to both sides of the app: public pages
+  // that should still sit in the workspace chrome once you are signed in.
+  {
+    path: '/',
+    element: <AdaptiveLayout />,
+    children: [
+      { path: '/docs', element: <Docs /> },
+      { path: '/seo-checker', element: <SeoChecker /> },
+    ],
+  },
+  {
+    path: '/',
+    element: <ShellLayout />,
+    children: [
       {
-        path: '/sites/:siteId',
-        element: <ProtectedRoute><SiteAdmin /></ProtectedRoute>,
+        path: '/dashboard',
+        element: <ProtectedRoute><Dashboard /></ProtectedRoute>,
+      },
+      {
+        path: '/analytics',
+        element: <ProtectedRoute><Analytics /></ProtectedRoute>,
+      },
+      {
+        path: '/profile',
+        element: <ProtectedRoute><Profile /></ProtectedRoute>,
       },
       {
         path: '/transactions',

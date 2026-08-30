@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useInShell } from "../layout/shellContext";
 import { Helmet } from "react-helmet";
 import { motion } from "framer-motion";
 import { Search, Globe, Wand2, ArrowRight, ListChecks, FileSearch, BadgeCheck } from "lucide-react";
@@ -35,6 +36,9 @@ const FAQS = [
 ];
 
 export default function SeoChecker() {
+  // Signed in this page sits in the app shell, whose header takes up its
+  // own space; the public navbar is fixed and has to be cleared.
+  const inShell = useInShell();
   const { user } = AuthStore.useState();
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -60,7 +64,7 @@ export default function SeoChecker() {
   const showCta = result && !isChasqrHosted(result.checkedUrl);
 
   return (
-    <div className="min-h-screen bg-white pt-24 pb-20 px-6">
+    <div className={`min-h-screen bg-white pb-20 px-6 ${inShell ? "pt-10" : "pt-24"}`}>
       <Helmet>
         <title>Free SEO Checker — Instantly Analyze Any Website's SEO Score | Chasqr</title>
         <meta

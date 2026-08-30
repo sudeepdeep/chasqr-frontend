@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "react-toastify";
 import { ChevronRight, Receipt, Crown } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { getTransactionsAPI, getPaymentInfoAPI } from "../api/payment.api";
 
 interface Tx {
@@ -13,19 +14,28 @@ interface Tx {
 }
 
 export default function Transactions() {
-  const [txs, setTxs] = useState<Tx[]>([]);
-  const [credits, setCredits] = useState(0);
-  const [loading, setLoading] = useState(true);
+  // Billing history is append-only and rarely changes, so it caches well —
+  // revisiting this page is instant rather than a fresh pair of requests.
+  const { data, isPending: loading, isError } = useQuery({
+    queryKey: ["transactions"],
+    queryFn: async () => {
+      const [txRes, infoRes] = await Promise.all([
+        getTransactionsAPI(),
+        getPaymentInfoAPI(),
+      ]);
+      return {
+        txs: (txRes.data.data.payments ?? []) as Tx[],
+        credits: (infoRes.data.data.credits || 0) as number,
+      };
+    },
+  });
+
+  const txs: Tx[] = data?.txs ?? [];
+  const credits: number = data?.credits ?? 0;
 
   useEffect(() => {
-    Promise.all([getTransactionsAPI(), getPaymentInfoAPI()])
-      .then(([txRes, infoRes]) => {
-        setTxs(txRes.data.data.payments);
-        setCredits(infoRes.data.data.credits || 0);
-      })
-      .catch(() => toast.error("Failed to load transactions"))
-      .finally(() => setLoading(false));
-  }, []);
+    if (isError) toast.error("Failed to load transactions");
+  }, [isError]);
 
   const formatAmount = (amount: number, currency: string) => {
     const value = (amount / 100).toFixed(2);
@@ -34,7 +44,7 @@ export default function Transactions() {
   };
 
   return (
-    <div className="min-h-screen bg-white pt-24 pb-16 px-6">
+    <div className="min-h-screen bg-white pt-8 pb-16 px-6">
       <div className="max-w-[1300px] mx-auto">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           {/* Breadcrumb */}
@@ -77,7 +87,7 @@ export default function Transactions() {
             </div>
           ) : (
             <div className="space-y-3">
-              {txs.map((tx, i) => (
+              {txs.map((tx: Tx, i: number) => (
                 <motion.div
                   key={tx.orderId}
                   initial={{ opacity: 0, y: 8 }}

@@ -25,15 +25,23 @@ import {
   Trash2,
   UploadCloud,
   X,
+  MousePointer2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import {
+  Link,
+  Navigate,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import { toast } from "react-toastify";
 import { getPaymentInfoAPI } from "../api/payment.api";
+import { useQueryClient } from "@tanstack/react-query";
+import { siteKeys, useSiteDetail } from "../queries/sites";
 import {
   addElementAPI,
   deleteSiteAPI,
-  getSiteAPI,
   redeployFilesAPI,
   redeployZipAPI,
   removeCustomDomainAPI,
@@ -59,6 +67,10 @@ import SupportSection from "../components/SupportSection";
 import { APP_DOMAIN, publicSiteUrl } from "../lib/siteUrl";
 import { getSocket } from "../lib/socket";
 import { AuthStore } from "../store/auth";
+import ShellHeader from "../layout/ShellHeader";
+import { CollapseToggle } from "../layout/SideNav";
+import { navRowClass, navShellClass } from "../layout/navStyles";
+import { SidebarStore } from "../store/sidebar";
 
 const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
@@ -139,8 +151,22 @@ export default function SiteAdmin() {
   const { user } = AuthStore.useState();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [site, setSite] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  // Cached per site id, so the dashboard → site → dashboard loop (much the most
+  // travelled path in the app) stops refetching the same document every time.
+  const qc = useQueryClient();
+  const { data: site, isPending: loading, isError: siteFailed } = useSiteDetail(siteId);
+
+  /**
+   * Drop-in replacement for the old useState setter.
+   *
+   * Every mutation on this page already ends by handing back the updated site,
+   * and setQueryData takes either a value or an updater — exactly the two
+   * shapes the fourteen existing call sites use. Writing straight to the cache
+   * keeps them working untouched, and means a save is reflected on the
+   * dashboard without a refetch.
+   */
+  const setSite = (updater: any) =>
+    qc.setQueryData(siteKeys.detail(siteId ?? ''), updater);
   const [saving, setSaving] = useState(false);
   const [activePage, setActivePage] = useState(0);
   const [pendingEdits, setPendingEdits] = useState<Record<string, string>>({});
@@ -153,6 +179,7 @@ export default function SiteAdmin() {
   const activeSectionRef = useRef(activeSection);
   const [unreadSupportCount, setUnreadSupportCount] = useState(0);
   const [busyControl, setBusyControl] = useState(false);
+  const { collapsed: navCollapsed } = SidebarStore.useState();
   const togglePause = async () => {
     if (!siteId) return;
     setBusyControl(true);
@@ -243,18 +270,19 @@ export default function SiteAdmin() {
   const hasChanges = Object.keys(pendingEdits).length > 0;
   const previewUrl = site ? `${BASE_URL}/sites/${site.slug}/` : "";
 
+  // The slug and domain inputs are seeded from the site once it arrives. They
+  // stay local state because the user types into them, and resetting on every
+  // cache write would wipe an edit mid-keystroke — so this syncs on identity
+  // change only, not on every render.
   useEffect(() => {
-    if (!siteId) return;
-    getSiteAPI(siteId)
-      .then((res) => {
-        const s = res.data.data.site;
-        setSite(s);
-        setSlugValue(s.slug);
-        setDomainValue(s.customDomain || "");
-      })
-      .catch(() => toast.error("Failed to load site"))
-      .finally(() => setLoading(false));
-  }, [siteId]);
+    if (!site) return;
+    setSlugValue(site.slug);
+    setDomainValue(site.customDomain || "");
+  }, [site?.siteId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (siteFailed) toast.error("Failed to load site");
+  }, [siteFailed]);
 
   // Find this site's active support request (if any) so we can listen for
   // expert replies even while the customer is on a different tab.
@@ -423,8 +451,11 @@ export default function SiteAdmin() {
     if (!siteId) return;
     setUpgrading(true);
     try {
-      const res = await getSiteAPI(siteId);
-      setSite(res.data.data.site);
+      // A real refetch: the plan changed server-side during checkout, so there
+      // is nothing local to write. The list is invalidated too — the dashboard
+      // card shows the plan badge and would otherwise still read "Free".
+      await qc.invalidateQueries({ queryKey: siteKeys.detail(siteId) });
+      qc.invalidateQueries({ queryKey: siteKeys.list() });
       setUpgradeModalOpen(false);
       toast.success("Site upgraded to PRO!");
     } catch (err: any) {
@@ -528,24 +559,32 @@ export default function SiteAdmin() {
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
+  // Both early states keep the header, so a slow load or a bad id still leaves
+  // the user somewhere they recognise with a way out.
   if (loading) {
     return (
-      <div className="min-h-screen bg-white pt-24 flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+      <div className="min-h-screen bg-white">
+        <ShellHeader />
+        <div className="flex items-center justify-center py-32">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        </div>
       </div>
     );
   }
 
   if (!site) {
     return (
-      <div className="min-h-screen bg-white pt-24 text-center">
-        <p className="text-slate-500">Site not found.</p>
-        <Link
-          to="/dashboard"
-          className="text-primary text-sm mt-2 inline-block hover:underline"
-        >
-          ← Back to Dashboard
-        </Link>
+      <div className="min-h-screen bg-white">
+        <ShellHeader />
+        <div className="py-32 text-center">
+          <p className="text-slate-500">Site not found.</p>
+          <Link
+            to="/dashboard"
+            className="mt-2 inline-block text-sm text-primary hover:underline"
+          >
+            ← Back to Dashboard
+          </Link>
+        </div>
       </div>
     );
   }
@@ -556,47 +595,227 @@ export default function SiteAdmin() {
   const isJSRenderedApp =
     pages.length > 0 && pages.every((p) => !p.contentMap?.length);
 
+  const currentSection = NAV_GROUPS.flatMap((g) => g.items).find(
+    (i) => i.id === activeSection,
+  );
+
   return (
-    <div className="min-h-screen bg-white pt-24 pb-16 px-6">
-      {/* Sticky save bar */}
-      <AnimatePresence>
-        {hasChanges && (
-          <motion.div
-            initial={{ y: -60, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -60, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 400, damping: 30 }}
-            className="fixed top-16 left-0 right-0 z-40 bg-primary shadow-lg"
+    <div className="min-h-screen bg-white">
+      <ShellHeader />
+
+      <div className="flex">
+        {/* Site sidebar. Sections are local state driving ?tab=, not routes, so
+            these are buttons — styled to match the workspace SideNav exactly so
+            the two shells read as one product. */}
+        <nav className={navShellClass(navCollapsed)}>
+          <Link
+            to="/dashboard"
+            title={navCollapsed ? "All sites" : undefined}
+            className={
+              navCollapsed
+                ? "mx-auto mb-3 flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-primary"
+                : "mb-3 flex items-center gap-1.5 px-2.5 text-[12.5px] font-medium text-slate-500 transition-colors hover:text-primary"
+            }
           >
-            <div className="max-w-[1300px] mx-auto px-6 h-12 flex items-center justify-between">
-              <span className="text-white text-sm font-medium">
-                {Object.keys(pendingEdits).length} unsaved change
-                {Object.keys(pendingEdits).length !== 1 ? "s" : ""}
-              </span>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setPendingEdits({})}
-                  className="flex items-center gap-1 text-white/70 hover:text-white text-sm transition-colors"
-                >
-                  <X size={14} /> Discard
-                </button>
-                <button
-                  onClick={() => handleSave(pendingEdits)}
-                  disabled={saving}
-                  className="flex items-center gap-1.5 bg-white text-primary text-sm font-semibold px-4 py-1.5 rounded-lg hover:bg-primary-light transition-colors disabled:opacity-60"
-                >
-                  {saving ? (
-                    <span className="animate-spin w-3 h-3 border-2 border-primary border-t-transparent rounded-full inline-block" />
-                  ) : (
-                    <Rocket size={13} />
+            <ChevronRight size={13} className="rotate-180" />
+            {!navCollapsed && "All sites"}
+          </Link>
+
+          {/* Which site you are in — the sections below are meaningless without
+              it, and the breadcrumb alone scrolls away. Collapsed it shrinks to
+              the initial plus its status dot, which still answers "which site". */}
+          {navCollapsed ? (
+            <div
+              title={site.name}
+              className="relative mx-auto mb-4 flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-[12px] font-semibold text-slate-700"
+            >
+              {site.name?.[0]?.toUpperCase() || "?"}
+              <span
+                className={`absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full ring-2 ring-white ${
+                  site.status === "active" ? "bg-green-600" : "bg-amber-500"
+                }`}
+              />
+            </div>
+          ) : (
+            <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2">
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={`h-[7px] w-[7px] shrink-0 rounded-full ${
+                    site.status === "active" ? "bg-green-600" : "bg-amber-500"
+                  }`}
+                />
+                <span className="truncate text-[13px] font-semibold text-slate-900">
+                  {site.name}
+                </span>
+              </div>
+              <p className="mt-0.5 truncate text-[11px] text-slate-400">
+                {site.customDomain || publicSiteUrl(site.slug).replace(/^https?:\/\//, "")}
+              </p>
+            </div>
+          )}
+
+          <div className="flex flex-1 flex-col gap-5">
+            {NAV_GROUPS.map((group, gi) => (
+              <div key={group.label} className="flex flex-col gap-0.5">
+                {navCollapsed
+                  ? gi > 0 && <span className="mx-auto mb-1 h-px w-6 bg-slate-200" />
+                  : (
+                    <span className="mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+                      {group.label}
+                    </span>
                   )}
-                  {saving ? "Deploying..." : "Save & Deploy"}
-                </button>
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const active = activeSection === item.id;
+                  const danger = item.id === "controls";
+                  const unread = item.id === "support" && unreadSupportCount > 0;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveSection(item.id)}
+                      title={navCollapsed ? item.label : undefined}
+                      className={`${navRowClass(active, { danger, collapsed: navCollapsed })} text-left`}
+                    >
+                      <span className="relative shrink-0">
+                        <Icon size={16} />
+                        {navCollapsed && unread && (
+                          <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-primary ring-2 ring-white" />
+                        )}
+                      </span>
+                      {!navCollapsed && (
+                        <>
+                          <span className="flex-1 truncate">{item.label}</span>
+                          {unread && (
+                            <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-white">
+                              {unreadSupportCount > 9 ? "9+" : unreadSupportCount}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+          <CollapseToggle collapsed={navCollapsed} />
+        </nav>
+
+        <main className="min-w-0 flex-1">
+          {/* Page bar: where you are, and what you can do to this site. Sticky
+              so Preview and Upgrade stay reachable down a long section. */}
+          <div className="sticky top-14 z-30 border-b border-slate-200 bg-white/95 px-6 py-3.5 backdrop-blur">
+            <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-[12px] text-slate-400">
+                  <Link to="/dashboard" className="transition-colors hover:text-primary">
+                    Dashboard
+                  </Link>
+                  <span>/</span>
+                  <span className="max-w-[160px] truncate text-slate-500">{site.name}</span>
+                  <span>/</span>
+                  <span className="font-medium text-slate-700">
+                    {currentSection?.label ?? "Editor"}
+                  </span>
+                </div>
+                <div className="mt-1 flex items-center gap-2.5">
+                  <h1 className="font-bebas text-2xl leading-none text-slate-900">
+                    {currentSection?.label ?? "Editor"}
+                  </h1>
+                  <span
+                    className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                      site.status === "active"
+                        ? "bg-green-50 text-green-700"
+                        : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        site.status === "active" ? "bg-green-600" : "bg-slate-400"
+                      }`}
+                    />
+                    {site.status === "active" ? "Active" : "Paused"}
+                  </span>
+                  {site.plan === "paid" && (
+                    <span className="flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">
+                      <Crown size={10} className="fill-amber-500 text-amber-500" /> PRO
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex shrink-0 items-center gap-2">
+                {/* Save state and publishing, only where edits are possible.
+                    Showing "All changes saved" on the Analytics tab would be
+                    answering a question nobody asked. */}
+                {activeSection === "editor" && (
+                  <>
+                    <span
+                      className={`hidden rounded-lg px-2.5 py-1.5 text-[12px] font-semibold sm:block ${
+                        hasChanges
+                          ? "bg-amber-50 text-amber-700"
+                          : "bg-green-50 text-green-700"
+                      }`}
+                    >
+                      {hasChanges
+                        ? `${Object.keys(pendingEdits).length} unsaved change${
+                            Object.keys(pendingEdits).length === 1 ? "" : "s"
+                          }`
+                        : "All changes saved"}
+                    </span>
+                    {hasChanges && (
+                      <button
+                        onClick={() => setPendingEdits({})}
+                        className="flex items-center gap-1 rounded-lg px-2 py-2 text-[13px] font-medium text-slate-500 transition-colors hover:text-slate-900"
+                      >
+                        <X size={13} /> Discard
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleSave(pendingEdits)}
+                      disabled={!hasChanges || saving}
+                      className="flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {saving ? (
+                        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      ) : (
+                        <Rocket size={13} />
+                      )}
+                      {saving ? "Publishing…" : "Publish changes"}
+                    </button>
+                  </>
+                )}
+
+                {site.plan !== "paid" && (
+                  <button
+                    onClick={handleUpgradeClick}
+                    disabled={upgrading}
+                    className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-3.5 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-amber-600 disabled:opacity-60"
+                  >
+                    {upgrading ? (
+                      <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    ) : (
+                      <Crown size={13} className="fill-white" />
+                    )}
+                    Upgrade to PRO
+                  </button>
+                )}
+                <a
+                  href={site ? publicSiteUrl(site.slug) : "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3.5 py-2 text-[13px] font-medium text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900"
+                >
+                  <ExternalLink size={13} /> Preview Site
+                </a>
               </div>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+
+          <div className="px-6 pb-16 pt-6">
+      {/* The old floating save bar lived here. Publishing now sits in the page
+          bar above, so the controls are in one place instead of a second bar
+          sliding over the content the moment you type. */}
 
       {/* Large redeploy payment modal */}
       <PaymentModal
@@ -631,136 +850,9 @@ export default function SiteAdmin() {
         )}
       </AnimatePresence>
 
-      <div className="max-w-[1300px] mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          {/* Breadcrumb */}
-          <div className="flex items-center gap-1.5 text-sm text-slate-400 mb-6">
-            <Link
-              to="/dashboard"
-              className="hover:text-primary transition-colors"
-            >
-              Dashboard
-            </Link>
-            <ChevronRight size={14} />
-            <span className="text-slate-700 font-medium">{site.name}</span>
-          </div>
-
-          {/* Header */}
-          <div className="flex items-start justify-between mb-8 flex-wrap gap-4">
-            <div>
-              <h1 className="font-bebas text-5xl text-slate-900">
-                {site.name}
-              </h1>
-              <div className="flex items-center gap-3 mt-2">
-                {site.plan === "paid" && (
-                  <span
-                    title="PRO site — unlimited upload size"
-                    className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-700 border border-amber-300"
-                  >
-                    <Crown
-                      size={11}
-                      className="fill-amber-500 text-amber-500"
-                    />{" "}
-                    PRO
-                  </span>
-                )}
-                <span
-                  className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                    site.status === "active"
-                      ? "bg-green-50 text-green-600"
-                      : "bg-slate-100 text-slate-500"
-                  }`}
-                >
-                  {site.status}
-                </span>
-                <span className="flex items-center gap-1 text-xs text-slate-400">
-                  <Eye size={11} /> {site.visits} visits
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {/* {activeSection === 'editor' && currentPage && (
-                <button
-                  onClick={() => setPreviewOpen(true)}
-                  className="flex items-center gap-1.5 border border-slate-200 text-slate-600 text-sm font-medium px-4 py-2.5 rounded-xl hover:bg-slate-50 transition-colors"
-                >
-                  <Eye size={14} /> Preview Changes
-                </button>
-              )} */}
-              {site.plan !== "paid" && (
-                <button
-                  onClick={handleUpgradeClick}
-                  disabled={upgrading}
-                  className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-yellow-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:from-amber-600 hover:to-yellow-600 transition-colors disabled:opacity-60"
-                >
-                  {upgrading ? (
-                    <span className="animate-spin w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full inline-block" />
-                  ) : (
-                    <Crown size={14} className="fill-white" />
-                  )}
-                  Upgrade to PRO
-                </button>
-              )}
-              <a
-                href={site ? publicSiteUrl(site.slug) : "#"}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 border border-slate-200 text-slate-600 text-sm font-medium px-4 py-2.5 rounded-xl hover:bg-slate-50 transition-colors"
-              >
-                <ExternalLink size={14} /> Preview Site
-              </a>
-            </div>
-          </div>
-
-          <div className="flex gap-8 items-start">
-            {/* Left sidebar nav */}
-            <nav className="w-56 shrink-0 sticky top-24 hidden md:block">
-              {NAV_GROUPS.map((group) => (
-                <div key={group.label} className="mb-6">
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide px-3 mb-2">
-                    {group.label}
-                  </p>
-                  <div className="space-y-0.5">
-                    {group.items.map((item) => {
-                      const Icon = item.icon;
-                      const active = activeSection === item.id;
-                      return (
-                        <button
-                          key={item.id}
-                          onClick={() => setActiveSection(item.id)}
-                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
-                            active
-                              ? "bg-primary-light text-primary"
-                              : "text-slate-600 hover:bg-slate-50"
-                          }`}
-                        >
-                          <Icon
-                            size={15}
-                            className={
-                              active ? "text-primary" : "text-slate-400"
-                            }
-                          />
-                          {item.label}
-                          {item.id === "domain" && site.customDomain && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 ml-auto" />
-                          )}
-                          {item.id === "support" && unreadSupportCount > 0 && (
-                            <span className="ml-auto min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-primary text-white text-[10px] font-semibold rounded-full">
-                              {unreadSupportCount > 9
-                                ? "9+"
-                                : unreadSupportCount}
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </nav>
+      <div className="mx-auto max-w-[1180px]">
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+          <div className="items-start">
 
             {/* Mobile section selector */}
             <div className="md:hidden w-full mb-2">
@@ -782,9 +874,6 @@ export default function SiteAdmin() {
               {/* Site URL */}
               {activeSection === "url" && (
                 <div className="p-5 bg-slate-50 rounded-xl border border-slate-200">
-                  <h2 className="font-bebas text-2xl text-slate-900 mb-1">
-                    Site URL
-                  </h2>
                   <p className="text-xs text-slate-500 mb-4">
                     The public link where your site is hosted on Chasqr.
                   </p>
@@ -871,9 +960,6 @@ export default function SiteAdmin() {
               {/* Custom Domain — free for all sites */}
               {activeSection === "domain" && (
                   <div className="p-5 bg-slate-50 rounded-xl border border-slate-200">
-                    <h2 className="font-bebas text-2xl text-slate-900 mb-1">
-                      Custom Domain
-                    </h2>
                     <p className="text-xs text-slate-500 mb-4">
                       Connect your own domain to this site.
                     </p>
@@ -969,9 +1055,6 @@ export default function SiteAdmin() {
               {activeSection === "files" && (
                 <div className="p-5 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
                   <div>
-                    <h2 className="font-bebas text-2xl text-slate-900 mb-1">
-                      Update Site Files
-                    </h2>
                     <p className="text-xs text-slate-500">
                       Upload a new version of your site. All existing files will
                       be replaced. Your URL and settings stay the same.
@@ -1113,7 +1196,7 @@ export default function SiteAdmin() {
               {activeSection === "editor" && (
                 <div>
                   {pages.length > 1 && (
-                    <div className="flex gap-1 mb-6 border-b border-slate-200 overflow-x-auto">
+                    <div className="flex gap-1 mb-6 border-b border-slate-200 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                       {pages.map((page, idx) => (
                         <button
                           key={page.filename}
@@ -1169,8 +1252,26 @@ export default function SiteAdmin() {
                 </div>
               )}
 
-              {/* Layout builder */}
-              {activeSection === "layout" && site && siteId && currentPage && (
+              {/* Layout opens Studio directly. A page still holding a grid
+                  layout keeps the choice below, because that layout can only
+                  be edited in the builder that made it. */}
+              {activeSection === "layout" &&
+                siteId &&
+                currentPage &&
+                !(currentPage as any).layout?.length && (
+                  <Navigate
+                    replace
+                    to={`/sites/${siteId}/studio?page=${encodeURIComponent(
+                      currentPage.filename,
+                    )}`}
+                  />
+                )}
+
+              {activeSection === "layout" &&
+                site &&
+                siteId &&
+                currentPage &&
+                !!(currentPage as any).layout?.length && (
                 <div>
                   <div className="mb-5 flex items-center justify-between gap-3 flex-wrap p-4 rounded-xl border border-primary/20 bg-primary-light/40">
                     <div className="flex items-center gap-2 text-sm text-slate-600">
@@ -1184,6 +1285,22 @@ export default function SiteAdmin() {
                       className="shrink-0 flex items-center gap-1.5 bg-primary text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors"
                     >
                       <LayoutTemplate size={14} /> Open full-screen builder
+                    </Link>
+                  </div>
+
+                  {/* The two editors use incompatible layout models, so a page
+                      is designed in one or the other rather than both. */}
+                  <div className="mb-5 flex items-center justify-between gap-3 flex-wrap p-4 rounded-xl border border-slate-200 bg-white">
+                    <div className="flex items-center gap-2 text-sm text-slate-600">
+                      <MousePointer2 size={16} className="text-primary" />
+                      Or design it freely in Studio — drag elements anywhere,
+                      with prebuilt sections and its own phone layout.
+                    </div>
+                    <Link
+                      to={`/sites/${siteId}/studio?page=${encodeURIComponent(currentPage.filename)}`}
+                      className="shrink-0 flex items-center gap-1.5 border border-slate-200 text-slate-700 text-sm font-semibold px-4 py-2 rounded-lg hover:border-primary hover:text-primary transition-colors"
+                    >
+                      <MousePointer2 size={14} /> Open Studio
                     </Link>
                   </div>
                   {/* <LayoutBuilder
@@ -1202,9 +1319,6 @@ export default function SiteAdmin() {
               {/* Pause & delete */}
               {activeSection === "controls" && (
                 <div>
-                  <h2 className="font-bebas text-2xl text-slate-900 mb-1">
-                    Pause &amp; Delete
-                  </h2>
                   <p className="text-xs text-slate-500 mb-5">
                     Take this site offline temporarily, or remove it for good.
                   </p>
@@ -1268,9 +1382,6 @@ export default function SiteAdmin() {
               {/* Form submissions */}
               {activeSection === "submissions" && siteId && currentPage && (
                 <div>
-                  <h2 className="font-bebas text-2xl text-slate-900 mb-1">
-                    Form Submissions
-                  </h2>
                   <p className="text-xs text-slate-500 mb-4">
                     Messages sent through your site's contact form.
                   </p>
@@ -1358,6 +1469,9 @@ export default function SiteAdmin() {
             </div>
           </div>
         </motion.div>
+          </div>
+          </div>
+        </main>
       </div>
     </div>
   );

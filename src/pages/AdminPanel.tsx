@@ -4,12 +4,12 @@ import { toast } from 'react-toastify';
 import { BarChart2, Users, Globe, CheckCircle2, Eye, Trash2, Headset, Crown, Receipt, MessageSquare, X, ExternalLink, Plus, Pencil, UserMinus } from 'lucide-react';
 import { publicSiteUrl } from '../lib/siteUrl';
 import {
-  getStatsAPI, getAllUsersAPI, getAllSitesAdminAPI,
   updateUserStatusAPI, updateUserRoleAPI, adminDeleteSiteAPI,
-  getAdminSupportRequestsAPI, getAdminRequestMessagesAPI,
-  getAdminExpertsAPI, getAdminPaymentsAPI,
+  getAdminRequestMessagesAPI,
   createExpertAPI, updateExpertAPI, removeExpertAPI,
 } from '../api/admin.api';
+import { useQueryClient } from '@tanstack/react-query';
+import { adminKeys, useAdminTab } from '../queries/admin';
 
 type Tab = 'stats' | 'users' | 'sites' | 'support' | 'experts' | 'payments';
 
@@ -170,30 +170,30 @@ function ExpertForm({
 
 export default function AdminPanel() {
   const [tab, setTab] = useState<Tab>('stats');
-  const [stats, setStats] = useState<any>(null);
-  const [users, setUsers] = useState<any[]>([]);
-  const [sites, setSites] = useState<any[]>([]);
-  const [supportRequests, setSupportRequests] = useState<any[]>([]);
-  const [experts, setExperts] = useState<any[]>([]);
-  const [payments, setPayments] = useState<any[]>([]);
   const [chatView, setChatView] = useState<{ id: string; messages: any[] } | null>(null);
   const [expertForm, setExpertForm] = useState<{ open: boolean; expert: any | null }>({ open: false, expert: null });
-  const [loading, setLoading] = useState(false);
+  const qc = useQueryClient();
 
-  useEffect(() => { loadTab(tab); }, [tab]); // eslint-disable-line
+  // Only the tab on screen is fetched, and each is cached under its own key —
+  // so flicking across the strip to compare things no longer reloads anything.
+  const { data, isPending, isError } = useAdminTab(tab);
+  const loading = isPending;
 
-  const loadTab = async (t: Tab) => {
-    setLoading(true);
-    try {
-      if (t === 'stats') { const r = await getStatsAPI(); setStats(r.data.data); }
-      else if (t === 'users') { const r = await getAllUsersAPI(); setUsers(r.data.data.users); }
-      else if (t === 'sites') { const r = await getAllSitesAdminAPI(); setSites(r.data.data.sites); }
-      else if (t === 'support') { const r = await getAdminSupportRequestsAPI(); setSupportRequests(r.data.data.requests); }
-      else if (t === 'experts') { const r = await getAdminExpertsAPI(); setExperts(r.data.data.experts); }
-      else { const r = await getAdminPaymentsAPI(); setPayments(r.data.data.payments); }
-    } catch { toast.error('Failed to load data'); }
-    finally { setLoading(false); }
-  };
+  useEffect(() => {
+    if (isError) toast.error('Failed to load data');
+  }, [isError]);
+
+  // The panel renders six different shapes from one query; each view reads the
+  // slice it owns and ignores the rest.
+  const stats = tab === 'stats' ? (data as any) : null;
+  const users = (tab === 'users' ? (data as any[]) : []) ?? [];
+  const sites = (tab === 'sites' ? (data as any[]) : []) ?? [];
+  const supportRequests = (tab === 'support' ? (data as any[]) : []) ?? [];
+  const experts = (tab === 'experts' ? (data as any[]) : []) ?? [];
+  const payments = (tab === 'payments' ? (data as any[]) : []) ?? [];
+
+  /** Drop a tab's cache so it refetches — used after a mutation changes it. */
+  const reloadTab = (t: Tab) => qc.invalidateQueries({ queryKey: adminKeys.tab(t) });
 
   const removeExpert = async (expert: any) => {
     // Spelled out because it isn't a delete: the account survives, which is
@@ -203,7 +203,9 @@ export default function AdminPanel() {
     )) return;
     try {
       await removeExpertAPI(expert._id);
-      setExperts((prev) => prev.filter((x) => x._id !== expert._id));
+      qc.setQueryData<any[]>(adminKeys.tab('experts'), (prev: any[] | undefined) =>
+        prev ? prev.filter((x: any) => x._id !== expert._id) : prev,
+      );
       toast.success('Expert access revoked');
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Could not revoke access');
@@ -220,7 +222,9 @@ export default function AdminPanel() {
   const handleUserStatus = async (userId: string, status: string) => {
     try {
       await updateUserStatusAPI(userId, status);
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, status } : u));
+      qc.setQueryData<any[]>(adminKeys.tab('users'), (prev: any[] | undefined) =>
+        prev ? prev.map((u: any) => (u.id === userId ? { ...u, status } : u)) : prev,
+      );
       toast.success(`User ${status}`);
     } catch { toast.error('Failed to update user'); }
   };
@@ -228,7 +232,9 @@ export default function AdminPanel() {
   const handleUserRole = async (userId: string, role: string) => {
     try {
       await updateUserRoleAPI(userId, role);
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role } : u));
+      qc.setQueryData<any[]>(adminKeys.tab('users'), (prev: any[] | undefined) =>
+        prev ? prev.map((u: any) => (u.id === userId ? { ...u, role } : u)) : prev,
+      );
       toast.success(`Role updated to ${role}`);
     } catch { toast.error('Failed to update role'); }
   };
@@ -237,7 +243,9 @@ export default function AdminPanel() {
     if (!window.confirm('Delete this site permanently?')) return;
     try {
       await adminDeleteSiteAPI(siteId);
-      setSites(prev => prev.filter(s => s.siteId !== siteId));
+      qc.setQueryData<any[]>(adminKeys.tab('sites'), (prev: any[] | undefined) =>
+        prev ? prev.filter((x: any) => x.siteId !== siteId) : prev,
+      );
       toast.success('Site deleted');
     } catch { toast.error('Failed to delete site'); }
   };
@@ -252,7 +260,7 @@ export default function AdminPanel() {
   ];
 
   return (
-    <div className="min-h-screen bg-white pt-24 pb-16 px-6">
+    <div className="min-h-screen bg-white pt-8 pb-16 px-6">
       <div className="max-w-[1300px] mx-auto">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="font-bebas text-5xl text-slate-900 mb-8">Admin Panel</h1>
@@ -522,7 +530,7 @@ export default function AdminPanel() {
             <ExpertForm
               expert={expertForm.expert}
               onClose={() => setExpertForm({ open: false, expert: null })}
-              onSaved={() => loadTab('experts')}
+              onSaved={() => reloadTab('experts')}
             />
           )}
 

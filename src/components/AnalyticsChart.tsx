@@ -1,25 +1,12 @@
-import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { BarChart3, TrendingUp, Eye } from 'lucide-react';
-import { getAnalyticsAPI } from '../api/site.api';
-
-interface AnalyticsData {
-  total: number;
-  last30Days: number;
-  dailyAverage: number;
-  chartData: Array<{ date: string; visits: number }>;
-}
+import { useSiteAnalytics, DayPoint } from '../queries/sites';
 
 export default function AnalyticsChart({ siteId }: { siteId: string }) {
-  const [data, setData] = useState<AnalyticsData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    getAnalyticsAPI(siteId)
-      .then(res => setData(res.data.data))
-      .catch(() => setData(null))
-      .finally(() => setLoading(false));
-  }, [siteId]);
+  // Deliberately the same cache key the account-wide Analytics page uses. That
+  // page already fetches every site's analytics, so opening a site's Analytics
+  // tab afterwards costs no request — and vice versa.
+  const { data, isPending: loading } = useSiteAnalytics(siteId);
 
   if (loading) {
     return (
@@ -38,7 +25,7 @@ export default function AnalyticsChart({ siteId }: { siteId: string }) {
   }
 
   // Find max visits for scaling
-  const maxVisits = Math.max(...data.chartData.map(d => d.visits), 1);
+  const maxVisits = Math.max(...data.chartData.map((d: DayPoint) => d.visits), 1);
 
   return (
     <div className="space-y-6">
@@ -93,7 +80,7 @@ export default function AnalyticsChart({ siteId }: { siteId: string }) {
         <h3 className="font-bebas text-lg text-slate-900 mb-4">Visitors (Last 30 Days)</h3>
 
         <div className="flex items-end justify-between gap-1 h-40">
-          {data.chartData.map((day, idx) => {
+          {data.chartData.map((day: DayPoint, idx: number) => {
             const height = maxVisits > 0 ? (day.visits / maxVisits) * 100 : 0;
             const isToday = idx === data.chartData.length - 1;
 

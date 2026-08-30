@@ -85,7 +85,7 @@ export default function SEOEditor({ siteId, siteSlug, pages, onSaveSuccess }: Pr
     <div className="space-y-6">
       {/* Page Selector */}
       {pages.length > 1 && (
-        <div className="flex gap-2 border-b border-slate-200 overflow-x-auto">
+        <div className="flex gap-2 border-b border-slate-200 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {pages.map((page, idx) => (
             <button
               key={page.filename}

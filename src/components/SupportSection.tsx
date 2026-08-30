@@ -169,7 +169,6 @@ export default function SupportSection({ siteId, hasSourceArchive, onActiveReque
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="font-bebas text-2xl text-slate-900 mb-1">Get Expert Help</h2>
         <p className="text-xs text-slate-500">
           No technical background? Chat with a verified expert, share your site's
           code in one click, and let them make the changes for you.
