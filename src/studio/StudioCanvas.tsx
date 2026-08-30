@@ -1,8 +1,13 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { resolveAsset } from "./assetUrl";
 import { fontStack } from "./fonts";
-import StudioElementView, { Corner, Handle, SelectionChrome } from "./StudioElementView";
+import StudioElementView, {
+  Corner,
+  Handle,
+  SelectionChrome,
+} from "./StudioElementView";
 import {
   Box,
   Breakpoint,
@@ -29,7 +34,14 @@ const GRID = 8;
 const SNAP = 6;
 
 type Drag =
-  | { kind: "move"; sectionId: string; ids: string[]; startX: number; startY: number; origin: Record<string, Box> }
+  | {
+      kind: "move";
+      sectionId: string;
+      ids: string[];
+      startX: number;
+      startY: number;
+      origin: Record<string, Box>;
+    }
   | {
       kind: "resize";
       sectionId: string;
@@ -42,7 +54,16 @@ type Drag =
       originFont?: number;
     }
   | { kind: "section"; sectionId: string; startY: number; origin: number }
-  | { kind: "radius"; sectionId: string; id: string; corner: Corner; startX: number; startY: number; origin: number; limit: number };
+  | {
+      kind: "radius";
+      sectionId: string;
+      id: string;
+      corner: Corner;
+      startX: number;
+      startY: number;
+      origin: number;
+      limit: number;
+    };
 
 const snap = (v: number) => Math.round(v / GRID) * GRID;
 
@@ -73,7 +94,10 @@ export default function StudioCanvas({
   selection: { sectionId: string | null; elementIds: string[] };
   /** The element whose text is being typed into, if any. */
   editingId: string | null;
-  onSelectionChange: (s: { sectionId: string | null; elementIds: string[] }) => void;
+  onSelectionChange: (s: {
+    sectionId: string | null;
+    elementIds: string[];
+  }) => void;
   /** `continuous` marks an edit mid-drag, so history records one entry per drag. */
   onChange: (next: StudioPage, continuous?: boolean) => void;
   /** Adds a section; the picker opens on it unless told otherwise. */
@@ -89,7 +113,10 @@ export default function StudioCanvas({
   const hostRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   const drag = useRef<Drag | null>(null);
-  const [guides, setGuides] = useState<{ x: number[]; y: number[] }>({ x: [], y: [] });
+  const [guides, setGuides] = useState<{ x: number[]; y: number[] }>({
+    x: [],
+    y: [],
+  });
 
   const design = DESIGN_WIDTH[bp];
 
@@ -110,7 +137,9 @@ export default function StudioCanvas({
       onChange(
         {
           ...page,
-          sections: page.sections.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+          sections: page.sections.map((s) =>
+            s.id === id ? { ...s, ...patch } : s,
+          ),
         },
         true,
       ),
@@ -128,7 +157,9 @@ export default function StudioCanvas({
               : {
                   ...s,
                   elements: s.elements.map((el) =>
-                    boxes[el.id] ? { ...el, boxes: { ...el.boxes, [bp]: boxes[el.id] } } : el,
+                    boxes[el.id]
+                      ? { ...el, boxes: { ...el.boxes, [bp]: boxes[el.id] } }
+                      : el,
                   ),
                 },
           ),
@@ -147,7 +178,12 @@ export default function StudioCanvas({
           sections: page.sections.map((s) =>
             s.id !== sectionId
               ? s
-              : { ...s, elements: s.elements.map((el) => (el.id === id ? { ...el, ...patch } : el)) },
+              : {
+                  ...s,
+                  elements: s.elements.map((el) =>
+                    el.id === id ? { ...el, ...patch } : el,
+                  ),
+                },
           ),
         },
         true,
@@ -251,7 +287,9 @@ export default function StudioCanvas({
         const next = Math.round(d.origin + (sx * dx + sy * dy) / 2);
         // Half the shorter side is a full pill; past that the shape stops
         // changing and the grip would feel dead.
-        patchElement(d.sectionId, d.id, { radius: Math.max(0, Math.min(d.limit, next)) });
+        patchElement(d.sectionId, d.id, {
+          radius: Math.max(0, Math.min(d.limit, next)),
+        });
         return;
       }
 
@@ -275,16 +313,30 @@ export default function StudioCanvas({
           const left = applySnap(x, xs);
           const centre = applySnap(x + o.w / 2, xs);
           const right = applySnap(x + o.w, xs);
-          if (left.hit !== null) { x = left.value; gx.push(left.value); }
-          else if (centre.hit !== null) { x = centre.value - o.w / 2; gx.push(centre.value); }
-          else if (right.hit !== null) { x = right.value - o.w; gx.push(right.value); }
+          if (left.hit !== null) {
+            x = left.value;
+            gx.push(left.value);
+          } else if (centre.hit !== null) {
+            x = centre.value - o.w / 2;
+            gx.push(centre.value);
+          } else if (right.hit !== null) {
+            x = right.value - o.w;
+            gx.push(right.value);
+          }
 
           const top = applySnap(y, ys);
           const midY = applySnap(y + o.h / 2, ys);
           const bottom = applySnap(y + o.h, ys);
-          if (top.hit !== null) { y = top.value; gy.push(top.value); }
-          else if (midY.hit !== null) { y = midY.value - o.h / 2; gy.push(midY.value); }
-          else if (bottom.hit !== null) { y = bottom.value - o.h; gy.push(bottom.value); }
+          if (top.hit !== null) {
+            y = top.value;
+            gy.push(top.value);
+          } else if (midY.hit !== null) {
+            y = midY.value - o.h / 2;
+            gy.push(midY.value);
+          } else if (bottom.hit !== null) {
+            y = bottom.value - o.h;
+            gy.push(bottom.value);
+          }
 
           const el = section.elements.find((e) => e.id === id);
           next[id] = { ...o, x, y: el?.escape ? y : Math.max(0, y) };
@@ -300,8 +352,14 @@ export default function StudioCanvas({
       let { x, y, w, h } = o;
       if (d.handle.includes("e")) w = o.w + dx;
       if (d.handle.includes("s")) h = o.h + dy;
-      if (d.handle.includes("w")) { x = o.x + dx; w = o.w - dx; }
-      if (d.handle.includes("n")) { y = o.y + dy; h = o.h - dy; }
+      if (d.handle.includes("w")) {
+        x = o.x + dx;
+        w = o.w - dx;
+      }
+      if (d.handle.includes("n")) {
+        y = o.y + dy;
+        h = o.h - dy;
+      }
 
       // A minimum stops an element being resized to nothing, which leaves no
       // handle big enough to grab and no way to recover it.
@@ -344,15 +402,37 @@ export default function StudioCanvas({
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
     };
-  }, [page, scale, bp, patchBoxes, patchSection, patchElement, patchResize, onGestureEnd]);
+  }, [
+    page,
+    scale,
+    bp,
+    patchBoxes,
+    patchSection,
+    patchElement,
+    patchResize,
+    onGestureEnd,
+  ]);
 
-  const beginMove = (section: StudioSection, elementId: string, e: React.PointerEvent) => {
-    const ids = selection.elementIds.includes(elementId) ? selection.elementIds : [elementId];
+  const beginMove = (
+    section: StudioSection,
+    elementId: string,
+    e: React.PointerEvent,
+  ) => {
+    const ids = selection.elementIds.includes(elementId)
+      ? selection.elementIds
+      : [elementId];
     const origin: Record<string, Box> = {};
     section.elements.forEach((el) => {
       if (ids.includes(el.id)) origin[el.id] = boxFor(el, bp);
     });
-    drag.current = { kind: "move", sectionId: section.id, ids, startX: e.clientX, startY: e.clientY, origin };
+    drag.current = {
+      kind: "move",
+      sectionId: section.id,
+      ids,
+      startX: e.clientX,
+      startY: e.clientY,
+      origin,
+    };
     document.body.style.userSelect = "none";
   };
 
@@ -373,7 +453,8 @@ export default function StudioCanvas({
         {page.sections.map((section, i) => {
           const height = heightFor(section, bp);
           const isSectionSelected =
-            selection.sectionId === section.id && selection.elementIds.length === 0;
+            selection.sectionId === section.id &&
+            selection.elementIds.length === 0;
 
           return (
             <div key={section.id}>
@@ -394,7 +475,9 @@ export default function StudioCanvas({
                   // Clipping is what stops a background image bleeding, but it
                   // also catches deliberate overhangs — so it is lifted for a
                   // section that holds one.
-                  section.elements.some((e) => e.escape) ? "" : "overflow-hidden"
+                  section.elements.some((e) => e.escape)
+                    ? ""
+                    : "overflow-hidden"
                 } ${isSectionSelected ? "outline outline-2 outline-primary" : ""}`}
               >
                 {/* An image layer rather than a CSS background, because that is
@@ -415,7 +498,8 @@ export default function StudioCanvas({
                       src={resolveAsset(section.bgImage, base)}
                       alt=""
                       style={{
-                        objectFit: section.bgFit === "contain" ? "contain" : "cover",
+                        objectFit:
+                          section.bgFit === "contain" ? "contain" : "cover",
                         objectPosition: section.bgPosition || "center",
                       }}
                       className="pointer-events-none absolute inset-0 h-full w-full"
@@ -443,13 +527,17 @@ export default function StudioCanvas({
                       onSelectionChange({
                         sectionId: section.id,
                         elementIds: additive
-                          ? Array.from(new Set([...selection.elementIds, el.id]))
+                          ? Array.from(
+                              new Set([...selection.elementIds, el.id]),
+                            )
                           : [el.id],
                       })
                     }
                     onDragStart={(e) => beginMove(section, el.id, e)}
                     onDoubleClick={() => onEditText(section.id, el.id)}
-                    onCommitText={(text) => onCommitText(section.id, el.id, text)}
+                    onCommitText={(text) =>
+                      onCommitText(section.id, el.id, text)
+                    }
                   />
                 ))}
 
@@ -457,7 +545,11 @@ export default function StudioCanvas({
                     its own place in the stack and its handles still clear
                     whatever is layered on top of it. */}
                 {section.elements
-                  .filter((el) => selection.elementIds.includes(el.id) && editingId !== el.id)
+                  .filter(
+                    (el) =>
+                      selection.elementIds.includes(el.id) &&
+                      editingId !== el.id,
+                  )
                   .map((el) => (
                     <SelectionChrome
                       key={`chrome-${el.id}`}
@@ -495,10 +587,18 @@ export default function StudioCanvas({
 
                 {/* Alignment guides, drawn only while a drag is snapping. */}
                 {guides.x.map((x, k) => (
-                  <div key={`gx${k}`} style={{ left: x }} className="pointer-events-none absolute inset-y-0 w-px bg-pink-500" />
+                  <div
+                    key={`gx${k}`}
+                    style={{ left: x }}
+                    className="pointer-events-none absolute inset-y-0 w-px bg-pink-500"
+                  />
                 ))}
                 {guides.y.map((y, k) => (
-                  <div key={`gy${k}`} style={{ top: y }} className="pointer-events-none absolute inset-x-0 h-px bg-pink-500" />
+                  <div
+                    key={`gy${k}`}
+                    style={{ top: y }}
+                    className="pointer-events-none absolute inset-x-0 h-px bg-pink-500"
+                  />
                 ))}
 
                 {section.elements.length === 0 && (
@@ -507,7 +607,9 @@ export default function StudioCanvas({
                     className="absolute inset-0 m-auto flex h-full w-full flex-col items-center justify-center gap-2 text-slate-400 transition-colors hover:bg-primary-light/30 hover:text-primary"
                   >
                     <Plus size={22} />
-                    <span className="text-[13px] font-medium">Add elements, or start from a template</span>
+                    <span className="text-[13px] font-medium">
+                      Add elements, or start from a template
+                    </span>
                   </button>
                 )}
 
