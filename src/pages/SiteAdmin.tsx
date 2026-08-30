@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Archive,
@@ -7,7 +8,6 @@ import {
   ChevronRight,
   Crown,
   ExternalLink,
-  Eye,
   FileCode,
   FileText,
   FolderGit2,
@@ -16,6 +16,7 @@ import {
   Inbox,
   LayoutTemplate,
   Link2,
+  MousePointer2,
   Palette,
   Pause,
   Pencil,
@@ -24,8 +25,7 @@ import {
   Rocket,
   Trash2,
   UploadCloud,
-  X,
-  MousePointer2,
+  X
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -37,8 +37,6 @@ import {
 } from "react-router-dom";
 import { toast } from "react-toastify";
 import { getPaymentInfoAPI } from "../api/payment.api";
-import { useQueryClient } from "@tanstack/react-query";
-import { siteKeys, useSiteDetail } from "../queries/sites";
 import {
   addElementAPI,
   deleteSiteAPI,
@@ -64,12 +62,13 @@ import SiteSeoChecker from "../components/SiteSeoChecker";
 import SourceArchiveControl from "../components/SourceArchiveControl";
 import Submissions from "../components/Submissions";
 import SupportSection from "../components/SupportSection";
-import { APP_DOMAIN, publicSiteUrl } from "../lib/siteUrl";
-import { getSocket } from "../lib/socket";
-import { AuthStore } from "../store/auth";
 import ShellHeader from "../layout/ShellHeader";
 import { CollapseToggle } from "../layout/SideNav";
 import { navRowClass, navShellClass } from "../layout/navStyles";
+import { APP_DOMAIN, publicSiteUrl } from "../lib/siteUrl";
+import { getSocket } from "../lib/socket";
+import { siteKeys, useSiteDetail } from "../queries/sites";
+import { AuthStore } from "../store/auth";
 import { SidebarStore } from "../store/sidebar";
 
 const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";

@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
-import { toast } from "react-toastify";
-import { ChevronRight, Receipt, Crown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { getTransactionsAPI, getPaymentInfoAPI } from "../api/payment.api";
+import { motion } from "framer-motion";
+import { ChevronRight, Crown, Receipt } from "lucide-react";
+import { useEffect } from "react";
+import { Link } from "react-router-dom";
+import { toast } from "react-toastify";
+import { getPaymentInfoAPI, getTransactionsAPI } from "../api/payment.api";
 
 interface Tx {
   orderId: string;
