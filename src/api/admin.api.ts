@@ -9,6 +9,17 @@ export const updateUserRoleAPI = (userId: string, role: string) =>
   api.put(`/api/admin/users/${userId}/role`, { role });
 export const adminDeleteSiteAPI = (siteId: string) =>
   api.delete(`/api/admin/sites/${siteId}`);
+export const adminSetSitePlanAPI = (siteId: string, plan: 'free' | 'paid') =>
+  api.put(`/api/admin/sites/${siteId}/plan`, { plan });
+export const sendAdminEmailAPI = (data: {
+  subject: string;
+  html: string;
+  audience: 'all' | 'free' | 'paid' | 'test' | 'individual';
+  /** 'branded' wraps the content in the Chasqr shell; 'raw' sends it as-is. */
+  template?: 'branded' | 'raw';
+  /** Required when audience === 'individual'. */
+  recipients?: string[];
+}) => api.post('/api/admin/email', data);
 export const getAdminSupportRequestsAPI = () => api.get('/api/admin/support-requests');
 export const getAdminRequestMessagesAPI = (id: string) =>
   api.get(`/api/admin/support-requests/${id}/messages`);

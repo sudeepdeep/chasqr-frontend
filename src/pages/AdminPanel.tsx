@@ -1,17 +1,317 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
-import { BarChart2, Users, Globe, CheckCircle2, Eye, Trash2, Headset, Crown, Receipt, MessageSquare, X, ExternalLink, Plus, Pencil, UserMinus } from 'lucide-react';
+import { BarChart2, Users, Globe, CheckCircle2, Eye, Trash2, Headset, Crown, Receipt, MessageSquare, X, ExternalLink, Plus, Pencil, UserMinus, Mail, Send, ArrowLeft } from 'lucide-react';
 import { publicSiteUrl } from '../lib/siteUrl';
+import { previewBranded, previewRaw, DEFAULT_TEMPLATE_CONTENT } from '../lib/emailTemplate';
+import { EMAIL_PRESETS, getPreset } from '../lib/emailPresets';
 import {
-  updateUserStatusAPI, updateUserRoleAPI, adminDeleteSiteAPI,
-  getAdminRequestMessagesAPI,
+  updateUserStatusAPI, updateUserRoleAPI, adminDeleteSiteAPI, adminSetSitePlanAPI,
+  getAdminRequestMessagesAPI, sendAdminEmailAPI,
   createExpertAPI, updateExpertAPI, removeExpertAPI,
 } from '../api/admin.api';
 import { useQueryClient } from '@tanstack/react-query';
 import { adminKeys, useAdminTab } from '../queries/admin';
 
 type Tab = 'stats' | 'users' | 'sites' | 'support' | 'experts' | 'payments';
+
+type Audience = 'all' | 'free' | 'paid' | 'test' | 'individual';
+
+const AUDIENCES: { key: Audience; label: string; hint: string }[] = [
+  { key: 'all', label: 'All users', hint: 'Every active account' },
+  { key: 'free', label: 'Free plan', hint: 'Active free users' },
+  { key: 'paid', label: 'PRO plan', hint: 'Active paying users' },
+  { key: 'individual', label: 'Specific people', hint: 'Enter email addresses' },
+  { key: 'test', label: 'Just me (test)', hint: 'Only your inbox' },
+];
+
+/** Split a comma/newline/space separated list into clean email addresses. */
+function parseRecipients(raw: string): string[] {
+  return Array.from(new Set(
+    raw.split(/[\s,;]+/).map((s) => s.trim().toLowerCase()).filter((s) => s.includes('@')),
+  ));
+}
+
+type Template = 'branded' | 'raw';
+
+/**
+ * Full-page email composer (not a modal — the modal was too cramped).
+ *
+ * Two columns: the form on the left, a live preview on the right. The preview
+ * runs in a sandboxed iframe (empty `sandbox`), so scripts/forms/navigation in
+ * the markup can't run against this admin session.
+ *
+ * Two content modes:
+ *  - Branded (default): the admin writes just the message body; it drops into
+ *    the fixed Chasqr shell (header + footer never change). Preview and backend
+ *    share the same template so what you see is what sends.
+ *  - Raw HTML: the admin supplies a complete document, sent as-is.
+ *
+ * The real send fans out one message per recipient via the backend (never a
+ * shared To/CC) with the unsubscribe footer and List-Unsubscribe header.
+ */
+function EmailComposer({ onClose, initialRecipients }: { onClose: () => void; initialRecipients?: string[] }) {
+  const hasInitial = !!initialRecipients?.length;
+  const [audience, setAudience] = useState<Audience>(hasInitial ? 'individual' : 'test');
+  const [template, setTemplate] = useState<Template>('branded');
+  const [subject, setSubject] = useState('');
+  const [content, setContent] = useState(DEFAULT_TEMPLATE_CONTENT);
+  // 'custom' = free HTML editing; otherwise a preset key drives the content
+  // from labelled fields the admin fills in.
+  const [presetKey, setPresetKey] = useState<string>('custom');
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
+  const [recipientsRaw, setRecipientsRaw] = useState((initialRecipients || []).join(', '));
+  const [sending, setSending] = useState(false);
+
+  const recipients = parseRecipients(recipientsRaw);
+  const activePreset = template === 'branded' && presetKey !== 'custom' ? getPreset(presetKey) : undefined;
+  // While a preset is active, its fields are the source of truth; otherwise the
+  // content textarea is.
+  const effectiveContent = activePreset ? activePreset.build(fieldValues) : content;
+  const previewHtml = template === 'branded' ? previewBranded(effectiveContent) : previewRaw(effectiveContent);
+
+  const choosePreset = (key: string) => {
+    if (key === 'custom') { setPresetKey('custom'); return; }
+    const p = getPreset(key);
+    if (!p) return;
+    const defaults: Record<string, string> = {};
+    p.fields.forEach((f) => { defaults[f.key] = f.default; });
+    setFieldValues(defaults);
+    setSubject(p.defaultSubject);
+    setPresetKey(key);
+  };
+
+  /** Drop the generated HTML into the editor and switch to free editing. */
+  const editHtmlDirectly = () => {
+    if (activePreset) setContent(activePreset.build(fieldValues));
+    setPresetKey('custom');
+  };
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!subject.trim() || !effectiveContent.trim()) {
+      toast.error('Add a subject and some content first');
+      return;
+    }
+    if (audience === 'individual' && recipients.length === 0) {
+      toast.error('Add at least one valid email address');
+      return;
+    }
+    if (audience !== 'test') {
+      const who =
+        audience === 'all' ? 'all active users'
+        : audience === 'individual' ? `${recipients.length} recipient${recipients.length === 1 ? '' : 's'}`
+        : `all active ${audience === 'paid' ? 'PRO' : 'free'} users`;
+      if (!window.confirm(`Send this email to ${who}?\n\nThis goes out immediately and can't be recalled. Send a "Just me (test)" copy first if you haven't yet.`)) return;
+    }
+    setSending(true);
+    try {
+      const r = await sendAdminEmailAPI({
+        subject: subject.trim(),
+        html: effectiveContent,
+        audience,
+        template,
+        ...(audience === 'individual' ? { recipients } : {}),
+      });
+      const { sent, failed, total } = r.data.data as { sent: number; failed: number; total: number };
+      if (failed > 0) toast.warn(`Sent to ${sent} of ${total} — ${failed} failed. Check the server logs.`);
+      else toast.success(`Sent to ${sent} recipient${sent === 1 ? '' : 's'}.`);
+      // Test sends stay on the page so a real send can follow.
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Could not send the email');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const field = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary';
+  const sendLabel = sending ? 'Sending…' : audience === 'test' ? 'Send test to me' : 'Send email';
+
+  return (
+    <form onSubmit={submit}>
+      {/* Header + actions */}
+      <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
+        <div>
+          <button type="button" onClick={onClose} className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 mb-2">
+            <ArrowLeft size={15} /> Back to users
+          </button>
+          <h1 className="font-bebas text-4xl text-slate-900 leading-none">Send Email</h1>
+          <p className="text-slate-500 text-sm mt-1">
+            From <span className="font-mono text-slate-600">hello@chasqr.com</span> — one message per recipient, with an unsubscribe footer.
+          </p>
+        </div>
+        <button
+          type="submit"
+          disabled={sending}
+          className="inline-flex items-center gap-1.5 bg-primary text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-60"
+        >
+          <Send size={15} />
+          {sendLabel}
+        </button>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-6 items-start">
+        {/* Left — form */}
+        <div className="space-y-5">
+          <div>
+            <label className="text-xs font-medium text-slate-600 block mb-1.5">Audience</label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {AUDIENCES.map((a) => (
+                <button
+                  key={a.key}
+                  type="button"
+                  onClick={() => setAudience(a.key)}
+                  className={`text-left px-3 py-2 rounded-lg border transition-colors ${
+                    audience === a.key ? 'border-primary bg-primary-light' : 'border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className={`block text-sm font-medium ${audience === a.key ? 'text-primary' : 'text-slate-700'}`}>{a.label}</span>
+                  <span className="block text-[11px] text-slate-400 leading-tight mt-0.5">{a.hint}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {audience === 'individual' && (
+            <div>
+              <label className="text-xs font-medium text-slate-600 block mb-1">
+                Recipients <span className="text-slate-400 font-normal">— separate with commas or new lines</span>
+              </label>
+              <textarea
+                className={`${field} resize-y`}
+                rows={2}
+                value={recipientsRaw}
+                onChange={(e) => setRecipientsRaw(e.target.value)}
+                placeholder="alice@example.com, bob@example.com"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                {recipients.length} valid address{recipients.length === 1 ? '' : 'es'} detected.
+              </p>
+            </div>
+          )}
+
+          <div>
+            <label className="text-xs font-medium text-slate-600 block mb-1.5">Template</label>
+            <div className="inline-flex rounded-lg border border-slate-200 p-0.5">
+              <button
+                type="button"
+                onClick={() => setTemplate('branded')}
+                className={`px-3.5 py-1.5 text-sm font-medium rounded-md transition-colors ${template === 'branded' ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+              >
+                Branded template
+              </button>
+              <button
+                type="button"
+                onClick={() => setTemplate('raw')}
+                className={`px-3.5 py-1.5 text-sm font-medium rounded-md transition-colors ${template === 'raw' ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+              >
+                Raw HTML
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1.5">
+              {template === 'branded'
+                ? 'Your content drops into the Chasqr shell — header, footer and styling stay fixed.'
+                : 'You supply the entire HTML document. It’s sent exactly as written.'}
+            </p>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-slate-600 block mb-1">Subject</label>
+            <input className={field} value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="What's new at Chasqr" required />
+          </div>
+
+          {template === 'branded' && (
+            <div>
+              <label className="text-xs font-medium text-slate-600 block mb-1">Start from</label>
+              <select
+                className={field}
+                value={presetKey}
+                onChange={(e) => choosePreset(e.target.value)}
+              >
+                <option value="custom">Custom — write my own</option>
+                {EMAIL_PRESETS.map((p) => (
+                  <option key={p.key} value={p.key}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {activePreset ? (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-medium text-slate-600">Editable fields</label>
+                <button type="button" onClick={editHtmlDirectly} className="text-xs text-primary hover:underline">
+                  Edit HTML directly
+                </button>
+              </div>
+              <div className="space-y-3">
+                {activePreset.fields.map((f) => (
+                  <div key={f.key}>
+                    <label className="text-[11px] font-medium text-slate-500 block mb-1">{f.label}</label>
+                    <input
+                      type={f.type === 'url' ? 'url' : 'text'}
+                      className={field}
+                      value={fieldValues[f.key] ?? f.default}
+                      onChange={(e) => setFieldValues((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                    />
+                    {f.hint && <p className="text-[11px] text-slate-400 mt-1">{f.hint}</p>}
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] text-slate-400 mt-3">
+                <span className="font-mono">{'{{first_name}}'}</span> is filled in per recipient. Unsubscribe + address are already in the footer.
+              </p>
+            </div>
+          ) : (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-slate-600">
+                  {template === 'branded' ? 'Message content' : 'Full HTML document'}
+                </label>
+                {template === 'branded' && (
+                  <button type="button" onClick={() => setContent(DEFAULT_TEMPLATE_CONTENT)} className="text-xs text-primary hover:underline">
+                    Reset to example
+                  </button>
+                )}
+              </div>
+              <textarea
+                className={`${field} font-mono text-xs resize-y`}
+                rows={16}
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder={template === 'branded'
+                  ? '<h1>Headline</h1>\n<p>Your message…</p>'
+                  : '<!DOCTYPE html><html>…</html>'}
+                required
+              />
+              <p className="text-[11px] text-slate-400 mt-1.5">
+                {template === 'branded'
+                  ? 'Use <h1>, <p>, <ul>, <a class="btn">…</a>, <img>. {{first_name}} is replaced per recipient. Unsubscribe + address are in the footer already.'
+                  : 'An unsubscribe footer is appended automatically. Add your postal address for full CAN-SPAM / GDPR compliance.'}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Right — live preview */}
+        <div className="lg:sticky lg:top-6">
+          <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
+            <div className="text-[11px] font-medium text-slate-500 px-3 py-2 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+              <span>Live preview</span>
+              <span className="text-slate-400">{template === 'branded' ? 'Branded template' : 'Raw HTML'}</span>
+            </div>
+            <iframe
+              title="Email preview"
+              sandbox=""
+              srcDoc={previewHtml || '<p style="color:#94a3b8;font-family:sans-serif;padding:12px">Nothing to preview yet.</p>'}
+              className="w-full h-[70vh] bg-white"
+            />
+          </div>
+        </div>
+      </div>
+    </form>
+  );
+}
 
 /**
  * Create/edit form for an expert.
@@ -172,6 +472,7 @@ export default function AdminPanel() {
   const [tab, setTab] = useState<Tab>('stats');
   const [chatView, setChatView] = useState<{ id: string; messages: any[] } | null>(null);
   const [expertForm, setExpertForm] = useState<{ open: boolean; expert: any | null }>({ open: false, expert: null });
+  const [emailComposer, setEmailComposer] = useState<{ open: boolean; recipients?: string[] }>({ open: false });
   const qc = useQueryClient();
 
   // Only the tab on screen is fetched, and each is cached under its own key —
@@ -250,6 +551,18 @@ export default function AdminPanel() {
     } catch { toast.error('Failed to delete site'); }
   };
 
+  const handleSetPlan = async (siteId: string, plan: 'free' | 'paid') => {
+    const label = plan === 'paid' ? 'PRO' : 'Free';
+    if (!window.confirm(`Set this site to ${label}?${plan === 'paid' ? ' This unlocks all PRO features with no payment.' : ''}`)) return;
+    try {
+      await adminSetSitePlanAPI(siteId, plan);
+      qc.setQueryData<any[]>(adminKeys.tab('sites'), (prev: any[] | undefined) =>
+        prev ? prev.map((x: any) => (x.siteId === siteId ? { ...x, plan } : x)) : prev,
+      );
+      toast.success(`Site set to ${label}`);
+    } catch { toast.error('Failed to change plan'); }
+  };
+
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: 'stats', label: 'Stats', icon: <BarChart2 size={15} /> },
     { key: 'users', label: 'Users', icon: <Users size={15} /> },
@@ -263,6 +576,14 @@ export default function AdminPanel() {
     <div className="min-h-screen bg-white pt-8 pb-16 px-6">
       <div className="max-w-[1300px] mx-auto">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+          {emailComposer.open ? (
+            <EmailComposer
+              key={emailComposer.recipients?.join(',') || 'all'}
+              initialRecipients={emailComposer.recipients}
+              onClose={() => setEmailComposer({ open: false })}
+            />
+          ) : (
+          <>
           <h1 className="font-bebas text-5xl text-slate-900 mb-8">Admin Panel</h1>
 
           <div className="flex gap-2 mb-8 border-b border-slate-200">
@@ -304,6 +625,15 @@ export default function AdminPanel() {
 
               {tab === 'users' && (
                 <div className="overflow-x-auto">
+                  <div className="flex justify-end mb-4">
+                    <button
+                      onClick={() => setEmailComposer({ open: true })}
+                      className="inline-flex items-center gap-1.5 bg-primary text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors"
+                    >
+                      <Mail size={15} />
+                      Send email
+                    </button>
+                  </div>
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-slate-200">
@@ -332,6 +662,9 @@ export default function AdminPanel() {
                               <button onClick={() => handleUserRole(u.id, u.role === 'admin' ? 'user' : 'admin')} className="text-xs px-2.5 py-1 border border-primary/20 text-primary rounded-lg hover:bg-primary-light">
                                 {u.role === 'admin' ? 'Demote' : 'Make Admin'}
                               </button>
+                              <button onClick={() => setEmailComposer({ open: true, recipients: [u.email] })} title={`Email ${u.email}`} className="inline-flex items-center gap-1 text-xs px-2.5 py-1 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50">
+                                <Mail size={11} /> Email
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -346,7 +679,7 @@ export default function AdminPanel() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-slate-200">
-                        {['Site', 'Owner', 'Pages', 'Status', 'Visits', 'Created', 'Actions'].map(h => (
+                        {['Site', 'Owner', 'Pages', 'Plan', 'Status', 'Visits', 'Created', 'Actions'].map(h => (
                           <th key={h} className="text-left py-3 px-2 text-slate-500 font-medium">{h}</th>
                         ))}
                       </tr>
@@ -368,6 +701,13 @@ export default function AdminPanel() {
                           <td className="py-3 px-2 text-slate-500">{s.userId?.email || '—'}</td>
                           <td className="py-3 px-2 text-slate-500">{s.pages?.length ?? 0}</td>
                           <td className="py-3 px-2">
+                            {s.plan === 'paid' ? (
+                              <span className="flex items-center gap-1 w-fit px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-600"><Crown size={11} /> PRO</span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500">Free</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-2">
                             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${s.status === 'active' ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-500'}`}>{s.status}</span>
                           </td>
                           <td className="py-3 px-2 text-slate-500 flex items-center gap-1"><Eye size={12} />{s.visits}</td>
@@ -382,6 +722,15 @@ export default function AdminPanel() {
                               >
                                 <ExternalLink size={11} /> Visit
                               </a>
+                              {s.plan === 'paid' ? (
+                                <button onClick={() => handleSetPlan(s.siteId, 'free')} className="flex items-center gap-1 text-xs px-2.5 py-1 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50">
+                                  Downgrade
+                                </button>
+                              ) : (
+                                <button onClick={() => handleSetPlan(s.siteId, 'paid')} className="flex items-center gap-1 text-xs px-2.5 py-1 border border-amber-200 text-amber-600 rounded-lg hover:bg-amber-50">
+                                  <Crown size={11} /> Make PRO
+                                </button>
+                              )}
                               <button onClick={() => handleDeleteSite(s.siteId)} className="flex items-center gap-1 text-xs px-2.5 py-1 border border-red-100 text-red-500 rounded-lg hover:bg-red-50">
                                 <Trash2 size={11} /> Delete
                               </button>
@@ -524,6 +873,8 @@ export default function AdminPanel() {
                 </div>
               )}
             </>
+          )}
+          </>
           )}
 
           {expertForm.open && (
